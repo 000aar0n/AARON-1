@@ -6,7 +6,8 @@ import pandas as pd
 import streamlit as st
 from individual import respond, history, vocabulary, symbolic_peer
 from avatar import render_face
-from personality import get_profile, save_profile, teach_reply, learned_examples, forget_example
+from personality import (get_profile, save_profile, teach_reply, learned_examples,
+                         forget_example, ensure_brainrot_training, training_stats)
 
 st.set_page_config(page_title="AARON-1 | Evolution Lab", page_icon="🧠", layout="wide")
 DATA = Path("data")
@@ -103,6 +104,7 @@ with tab2:
                    "or evidence of general intelligence.")
     evolution_monitor()
 with tab3:
+    ensure_brainrot_training()
     st.subheader("Talk to AARON-1")
     st.caption("No pretrained models or language-model APIs. This is a tiny symbolic learner with durable local SQLite memory — not free-form language understanding.")
     st.info("Try: `my favorite food is ramen`, `what is my favorite food`, or `teach: sup = greeting`.")
@@ -143,16 +145,15 @@ with tab3:
                     st.warning("Add both an example message and your preferred reply.")
         examples = learned_examples()
         if examples:
-            st.caption(f"{len(examples)} example replies learned")
-            with st.container(border=True):
-                for i, (input_example, reply_example) in enumerate(examples):
-                    a, b = st.columns([5, 1])
-                    with a:
-                        st.write(f"**{input_example}** → {reply_example}")
-                    with b:
-                        if st.button("Forget", key=f"forget_example_{i}"):
-                            forget_example(input_example)
-                            st.rerun()
+            st.caption(f"{len(examples)} total response examples. Your new corrections take priority over bundled lessons.")
+            if st.toggle("Browse and manage learned replies", value=False, key="show_training_replies"):
+                st.dataframe(pd.DataFrame(examples, columns=["Message", "Learned response"]),
+                             height=240, use_container_width=True, hide_index=True)
+                selected = st.selectbox("Select one to forget", [p for p, _ in examples],
+                                        key="forget_brainrot_reply")
+                if st.button("Forget selected reply", key="forget_chosen_reply"):
+                    forget_example(selected)
+                    st.rerun()
     for utterance, reply in history(15):
         with st.chat_message("user"):
             st.write(utterance)
