@@ -62,7 +62,43 @@ def monitor():
     st.caption("Agent A learns a symbol for each hidden target. Agent B learns to decode it. "
                "100% on known targets is not evidence of language understanding or generalization.")
 
-monitor()
+tab1, tab2 = st.tabs(["📡 Signal Learning", "🧬 Evolution"])
+with tab1:
+    monitor()
+with tab2:
+    st.subheader("Genetic Evolution Experiment")
+    st.caption("Independent population of 48 cooperating sender/receiver policy pairs. Selection, crossover, and mutation evolve discrete communication scores.")
+    @st.fragment(run_every="2s")
+    def evolution_monitor():
+        evo = read(DATA / "evolution_status.json")
+        ctl = read(DATA / "evolution_control.json")
+        online = evo.get("running") and time.time() - evo.get("updated_at", 0) < 12
+        st.write("🟢 Evolution trainer online" if online else "⚪ Evolution trainer offline")
+        if not evo:
+            st.info("Start the separate evolution engine in another Terminal: `python3 evolution.py`")
+            return
+        paused = st.toggle("Pause evolution", value=ctl.get("paused", False),
+                           disabled=not online, key="evolution_paused")
+        if online and paused != ctl.get("paused", False):
+            (DATA / "evolution_control.json").write_text(
+                json.dumps({"paused": paused}), encoding="utf-8")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Generation", evo.get("generation", 0))
+        c2.metric("Population", evo.get("population_size", 0))
+        c3.metric("Best cooperation", f"{100*evo.get('best_fitness', 0):.1f}%")
+        c4.metric("Mean cooperation", f"{100*evo.get('mean_fitness', 0):.1f}%")
+        hist = pd.DataFrame(evo.get("history", []))
+        if not hist.empty:
+            st.line_chart(hist.set_index("generation")[["best_fitness", "mean_fitness"]],
+                          y_label="Fitness (0–1)")
+        mapping = evo.get("mapping", [])
+        if mapping:
+            st.subheader("Top agent pair's code")
+            st.dataframe(mapping, use_container_width=True, hide_index=True)
+        st.caption("Fitness is success on the same eight target states used for selection. "
+                   "This is genuine genetic search on fixed policies, not open-ended evolution "
+                   "or evidence of general intelligence.")
+    evolution_monitor()
 with st.expander("How the experiment works"):
     st.write("Two tabular reinforcement-learning policies share only a discrete signal. "
              "A receives the hidden target and chooses a signal. B sees the signal and "
