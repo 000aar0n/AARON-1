@@ -3,13 +3,15 @@
 The evaluation only covers the two declared simulated environments.
 """
 import json
+import os
 import random
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 from agency import (
     ACTIONS, AARONAgent, GOALS, IDENTITY, PRETRAINED_POLICY,
-    PracticeWorkspace, atomic_json, read_json,
+    PracticeWorkspace, atomic_json, read_json, preview_local_folder,
 )
 
 
@@ -67,6 +69,31 @@ class AgencyTests(unittest.TestCase):
             self.assertEqual(restored.identity, IDENTITY)
             self.assertEqual(restored.q, agent.q)
             self.assertEqual(restored.episodes, agent.episodes)
+
+
+    def test_local_preview_only_reads_permitted_file_names(self):
+        agent = AARONAgent(read_json(PRETRAINED_POLICY))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "permitted"
+            root.mkdir()
+            sample = root / "homework.pdf"
+            sample.write_text("untouched content", encoding="utf-8")
+            with patch.dict(os.environ, {"AARON_AGENCY_PREVIEW_ROOT": str(root)}):
+                preview = preview_local_folder(root, agent)
+                self.assertEqual(preview["files_changed"], 0)
+                self.assertEqual(preview["items"][0]["decision"], "Would organize into Documents")
+                self.assertEqual(sample.read_text(encoding="utf-8"), "untouched content")
+
+    def test_unapproved_preview_directory_rejected(self):
+        agent = AARONAgent(read_json(PRETRAINED_POLICY))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "allowed"
+            other = Path(directory) / "private"
+            root.mkdir()
+            other.mkdir()
+            with patch.dict(os.environ, {"AARON_AGENCY_PREVIEW_ROOT": str(root)}):
+                with self.assertRaises(ValueError):
+                    preview_local_folder(other, agent)
 
 
 if __name__ == "__main__":
