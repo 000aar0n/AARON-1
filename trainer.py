@@ -43,6 +43,11 @@ def main():
         while RUN:
             control = read_json(CONTROL, {})
             if control.get("paused", False):
+                status = read_json(STATUS, {})
+                status["running"] = True
+                status["paused"] = True
+                status["updated_at"] = time.time()
+                atomic_json(STATUS, status)
                 time.sleep(0.5)
                 continue
             wins = 0
@@ -69,9 +74,7 @@ def main():
             atomic_json(CHECKPOINT, checkpoint)
             current_accuracy, current_mapping = pair.accuracy()
             atomic_json(STATUS, {"running": True, "updated_at": time.time(),
-                        "generation": generations, "episodes": sum(
-                            x["n"] * 0 + 1000 for x in history
-                        ), "total_episodes": generations * 1000,
+                        "generation": generations, "paused": False, "total_episodes": generations * 1000,
                         "symbols": pair.n, "train_accuracy": recent,
                         "greedy_accuracy": current_accuracy, "mapping": current_mapping,
                         "history": history, "event": last_event})
