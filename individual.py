@@ -54,39 +54,46 @@ def history(limit=30):
         return cx.execute("SELECT input,response FROM dialogue ORDER BY id DESC LIMIT ?", (limit,)).fetchall()[::-1]
 
 def respond(message):
+    """Handle conversation using saved examples first, then bounded symbolic rules."""
+    # Import inside this function to keep the DB helpers independent of style code.
+    from personality import learned_response, voice
+
     raw = message.strip()
     msg = raw.lower().strip(" .!?")
     if not msg:
         return "Say something and I'll try to understand it."
-    # Syntax: teach: hello = greeting
-    m = re.fullmatch(r"teach:\s*(.+?)\s*=\s*(.+)", msg)
-    if m:
-        teach(m.group(1), m.group(2))
-        reply = f"Learned: '{m.group(1)}' means '{m.group(2)}'."
-    elif msg in ("hello", "hi", "hey"):
-        reply = "Hello! I'm AARON-1. I can learn simple words and remember facts you teach me."
-    elif msg in ("who are you", "what are you"):
-        reply = "I'm AARON-1, a persistent experimental agent. My conversation system is symbolic, not an LLM."
-    elif msg in ("what do you know", "help"):
-        reply = "Try: 'my favorite color is blue', 'what is my favorite color', or 'teach: yo = greeting'."
+
+    taught = learned_response(raw)
+    if taught is not None:
+        reply = taught
     else:
-        m = re.fullmatch(r"my (.+?) is (.+)", msg)
-        q = re.fullmatch(r"what is my (.+)", msg)
+        m = re.fullmatch(r"teach:\s*(.+?)\s*=\s*(.+)", msg)
+        fact = re.fullmatch(r"my (.+?) is (.+)", msg)
+        question = re.fullmatch(r"what is my (.+)", msg)
         if m:
-            attribute, value = m.group(1), m.group(2)
+            teach(m.group(1), m.group(2))
+            reply = voice("word", attribute=m.group(1), value=m.group(2))
+        elif msg in ("hello", "hi", "hey", "yo", "wassup", "sup"):
+            reply = voice("greeting")
+        elif msg in ("who are you", "what are you"):
+            reply = voice("identity")
+        elif msg in ("what do you know", "help"):
+            reply = voice("help")
+        elif fact:
+            attribute, value = fact.group(1), fact.group(2)
             learn_fact("user", attribute, value)
-            reply = f"Okay, I'll remember that your {attribute} is {value}."
-        elif q:
-            attribute = q.group(1)
+            reply = voice("saved", attribute=attribute, value=value)
+        elif question:
+            attribute = question.group(1)
             value = recall_fact("user", attribute)
-            reply = f"Your {attribute} is {value}." if value else f"I don't know your {attribute} yet. Tell me!"
+            reply = (voice("recall", attribute=attribute, value=value) if value
+                     else voice("missing", attribute=attribute))
         else:
             matches = [meaning for phrase, meaning in vocabulary() if phrase == msg]
             if matches:
-                reply = f"I recognize '{raw}' as '{matches[0]}'. What should I do with that meaning?"
+                reply = voice("recognized", attribute=raw, value=matches[0])
             else:
-                reply = ("I don't understand that yet. You can teach a word with "
-                         "'teach: phrase = meaning', or tell me a fact using 'my X is Y'.")
+                reply = voice("unknown")
     log(raw, reply)
     return reply
 
