@@ -102,7 +102,8 @@ def finish_auth(query):
         raise RuntimeError("Google did not return an authorization code")
 
     config = json.loads(CLIENT_FILE.read_text(encoding="utf-8"))
-    flow = Flow.from_client_config(config, scopes=SCOPES, redirect_uri=REDIRECT_URI)
+    flow = Flow.from_client_config(config, scopes=SCOPES, redirect_uri=REDIRECT_URI,
+                                   state=pending['state'])
     flow.fetch_token(code=code)
     granted = set(flow.credentials.scopes or SCOPES)
     if not set(SCOPES).issubset(granted):
