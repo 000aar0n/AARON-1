@@ -5,9 +5,7 @@ No LLM, agent network, mock multi-agent population, or access without permission
 from __future__ import annotations
 
 import html
-from datetime import date
 
-import pandas as pd
 import streamlit as st
 
 from assistant_core import (
@@ -126,8 +124,8 @@ def render_connections():
 
     with st.container(border=True):
         st.markdown("#### ✉️ Gmail")
-        st.caption("Personal Gmail is fine. Read-only access to inbox metadata "
-                   "and message snippets, approved by you through Google.")
+        st.caption("Personal Gmail is fine. Google grants read-only mail access; "
+                   "this app requests only headers and short snippets.")
         if connected():
             st.success("Gmail authorization saved · read-only")
             if st.button("Check connected account", key="check_account"):
@@ -223,8 +221,10 @@ def render_connections():
 
     with st.expander("Privacy & permissions"):
         st.write("Gmail permission requested: gmail.readonly. "
-                 "AARON-1 cannot send mail or delete messages. "
-                 "The app reads basic headers/snippets only when asked. "
+                 "This Google permission technically allows reading message bodies, "
+                 "but AARON-1 only requests headers and snippets. "
+                 "AARON-1 cannot send or delete messages. "
+                 "The app checks Gmail only when you ask. "
                  "Tokens remain local in data/ and are excluded from GitHub. "
                  "Never upload Google passwords or private keys to the repository.")
 
