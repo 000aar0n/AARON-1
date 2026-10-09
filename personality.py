@@ -7,6 +7,7 @@ import difflib
 import re
 from individual import connect
 from brainrot_corpus import BRAINROT_EXAMPLES
+from dating_corpus import DATING_EXAMPLES
 
 DEFAULTS = {
     "energy": "2",
@@ -74,6 +75,35 @@ def ensure_brainrot_training(force=False):
         return added
 
 
+
+DATING_VERSION = "crush_rizz_lessons_v1"
+
+
+def ensure_dating_training():
+    """Install the new add-on once, preserving existing taught replies and settings."""
+    with connect() as cx:
+        initialize(cx)
+        already = cx.execute(
+            "SELECT value FROM personality_settings WHERE setting=?",
+            (DATING_VERSION,),
+        ).fetchone()
+        if already:
+            return 0
+        before = cx.total_changes
+        cx.executemany(
+            "INSERT OR IGNORE INTO reply_examples(prompt,response) VALUES (?,?)",
+            [(normalized(prompt)[:300], response[:1000])
+             for prompt, response in DATING_EXAMPLES if normalized(prompt)],
+        )
+        count = cx.total_changes - before
+        cx.execute(
+            "INSERT INTO personality_settings(setting,value) VALUES (?,?)",
+            (DATING_VERSION, "installed"),
+        )
+        cx.commit()
+        return count
+
+
 def training_stats():
     """Return installed example count and whether the initial lesson ran."""
     with connect() as cx:
@@ -83,7 +113,7 @@ def training_stats():
             "SELECT 1 FROM personality_settings WHERE setting=?",
             (BRAINROT_VERSION,),
         ).fetchone() is not None
-    return {"examples": count, "brainrot_installed": installed, "bundled": len(BRAINROT_EXAMPLES)}
+    return {"examples": count, "brainrot_installed": installed, "bundled": len(BRAINROT_EXAMPLES), "dating_bundled": len(DATING_EXAMPLES)}
 
 
 def get_profile():
