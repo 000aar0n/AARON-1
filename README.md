@@ -88,3 +88,16 @@ Example messages:
 - `sup`
 
 This version **does not** train neural language comprehension. Teaching a word stores a mapping; it does not magically give an AI natural-language understanding. Free-form conversation will be limited until we build grounded language-learning tasks that update a trainable model. Chat logs and taught information remain local in `data/aaron_individual.sqlite3`.
+
+## 🎭 Cartoon avatar and voice
+
+The **💬 AARON-1** tab now displays a cartoon character. Eyes blink, its head gently moves, and its mouth animates while the browser's built-in speech synthesis reads the latest AI response. Press **Speak reply** to trigger it; use **Stop** to cancel. Speech playback requires browser support and user interaction. It doesn't add an LLM, pretrained conversational intelligence, or voice-to-voice interaction, and the mouth uses an approximate animation rather than phoneme-accurate lip sync.
+
+To get the latest interface:
+
+```bash
+cd ~/AARON-1
+git pull
+```
+
+Refresh Streamlit and open **💬 AARON-1**. Your existing saved conversations and training checkpoints remain in the ignored `data/` directory.
