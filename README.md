@@ -101,3 +101,18 @@ git pull
 ```
 
 Refresh Streamlit and open **💬 AARON-1**. Your existing saved conversations and training checkpoints remain in the ignored `data/` directory.
+
+## 🤖 Robot avatar (latest)
+
+The AARON-1 chat tab now renders an animated robot instead of a human cartoon. **Test mouth** always runs a visual-only mouth animation, even if speech isn't supported. **Speak reply** tries your browser's built-in text-to-speech and starts mouth animation immediately; speech may be unavailable in a browser's embedded iframe, so sound is not guaranteed. No LLM or external speech API is used.
+
+To update the **existing** local dashboard, stop the Streamlit foreground process with Ctrl+C in its existing Terminal, then run:
+
+```bash
+cd ~/AARON-1
+git pull
+source .venv/bin/activate
+python3 -m streamlit run app.py
+```
+
+Refresh your existing browser tab; no new windows are required. Local training checkpoints and memories are preserved.
