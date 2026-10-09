@@ -20,6 +20,8 @@ ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
 DB = DATA / "aaron_personal.sqlite3"
 WEIGHTS = DATA / "priority_weights.json"
+PRETRAINED = ROOT / "models" / "priority_seed.json"
+LEGACY_MEMORY = DATA / "aaron_individual.sqlite3"
 BASE_WEIGHTS = [0.1, 2.3, 1.5, 0.6, 0.7, 0.4, 1.1]
 FEATURES = ("bias", "overdue", "due_today", "due_week", "school", "inbox", "starred")
 
@@ -35,11 +37,61 @@ def connect():
       starred INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL)""")
     db.execute("CREATE UNIQUE INDEX IF NOT EXISTS imported_task ON tasks(source,external_id) WHERE external_id IS NOT NULL")
+    db.execute("""CREATE TABLE IF NOT EXISTS memories (
+      name TEXT PRIMARY KEY, value TEXT NOT NULL)""")
+    db.execute("""CREATE TABLE IF NOT EXISTS migrations (
+      name TEXT PRIMARY KEY, completed INTEGER NOT NULL DEFAULT 1)""")
     db.execute("""CREATE TABLE IF NOT EXISTS learning (
       id INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT,
       label INTEGER NOT NULL, created_at TEXT NOT NULL)""")
     db.commit()
     return db
+
+
+def migrate_legacy_facts():
+    """Import only user-taught personal facts from the old database, once.
+
+    Leaves the original chat and agent-network checkpoints untouched.
+    """
+    if not LEGACY_MEMORY.is_file():
+        return 0
+    with connect() as db:
+        if db.execute("SELECT 1 FROM migrations WHERE name='legacy_facts_v1'").fetchone():
+            return 0
+        try:
+            old = sqlite3.connect(f"file:{LEGACY_MEMORY.resolve()}?mode=ro", uri=True)
+            with old:
+                facts = old.execute(
+                    "SELECT attribute,value FROM facts WHERE subject='user'"
+                ).fetchall()
+            old.close()
+        except (sqlite3.DatabaseError, OSError):
+            return 0
+        db.executemany(
+            "INSERT OR IGNORE INTO memories(name,value) VALUES (?,?)",
+            [(name, value) for name, value in facts]
+        )
+        db.execute("INSERT INTO migrations(name) VALUES ('legacy_facts_v1')")
+        db.commit()
+        return len(facts)
+
+
+def remember(name, value):
+    key = str(name).strip().lower()[:120]
+    value = str(value).strip()[:1000]
+    if not key or not value:
+        raise ValueError("Memory needs a name and value")
+    with connect() as db:
+        db.execute("INSERT OR REPLACE INTO memories(name,value) VALUES (?,?)",
+                   (key, value))
+        db.commit()
+
+
+def recall(name):
+    with connect() as db:
+        result = db.execute("SELECT value FROM memories WHERE name=?",
+                            (str(name).strip().lower(),)).fetchone()
+    return result["value"] if result else None
 
 
 def validate_date(value):
@@ -115,14 +167,17 @@ def features(task, today=None):
 
 
 def load_weights():
-    try:
-        obj = json.loads(WEIGHTS.read_text(encoding="utf-8"))
-        weights = obj["weights"]
-        if (len(weights) == len(FEATURES) and
-                all(isinstance(x, (int, float)) and math.isfinite(x) for x in weights)):
-            return [float(x) for x in weights], int(obj.get("feedback_count", 0))
-    except (OSError, KeyError, ValueError, TypeError):
-        pass
+    # Local feedback always wins; bundled pretrained baseline is loaded only
+    # when the user has not trained their own policy yet.
+    for path in (WEIGHTS, PRETRAINED):
+        try:
+            obj = json.loads(path.read_text(encoding="utf-8"))
+            weights = obj["weights"]
+            if (len(weights) == len(FEATURES) and
+                    all(isinstance(x, (int, float)) and math.isfinite(x) for x in weights)):
+                return [float(x) for x in weights], int(obj.get("feedback_count", 0))
+        except (OSError, KeyError, ValueError, TypeError):
+            pass
     return BASE_WEIGHTS[:], 0
 
 
@@ -143,8 +198,7 @@ def score_task(task, today=None):
 
 
 def ranked_tasks():
-    return sorted(list_tasks(), key=lambda t: (score_task(t), t.get("due") or "9999-12-31"),
-                  reverse=True)
+    return sorted(list_tasks(), key=lambda t: (-score_task(t), t.get("due") or "9999-12-31"))
 
 
 def learn_priority(task_id, important):
