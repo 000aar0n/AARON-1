@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 from individual import respond, history, vocabulary, symbolic_peer
 from avatar import render_face
+from agency import GOALS, ACTIONS, ACTION_LABELS, load_agent
 from personality import (get_profile, save_profile, teach_reply, learned_examples,
                          forget_example, ensure_brainrot_training, training_stats)
 
@@ -66,7 +67,7 @@ def monitor():
     st.caption("Agent A learns a symbol for each hidden target. Agent B learns to decode it. "
                "100% on known targets is not evidence of language understanding or generalization.")
 
-tab1, tab2, tab3 = st.tabs(["📡 Signal Learning", "🧬 Evolution", "💬 AARON-1"])
+tab1, tab2, tab3, tab4 = st.tabs(["📡 Signal Learning", "🧬 Evolution", "💬 AARON-1", "🧠 Agency"])
 with tab1:
     monitor()
 with tab2:
@@ -186,6 +187,71 @@ with tab3:
             st.write(f"Sender transmits symbol #{outcome['signal']}; receiver decodes location #{outcome['decoded']}.")
             st.success("Communication worked") if outcome["correct"] else st.error("They disagreed")
     st.caption("The English chat and learned symbol protocol are currently separate systems. Later we can connect them through explicit grounded teaching tasks.")
+
+with tab4:
+    st.subheader("AARON-1 · Agency Lab")
+    st.caption("An actual trained Q-learning policy chooses tools, observes results, "
+               "gets rewards, and keeps learning. The environments are safe simulations: "
+               "no real folders, emails, apps, or accounts are touched.")
+    agent = load_agent()
+    metrics = agent.evaluate(trials_per_goal=100)
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Lifetime training episodes", f"{agent.episodes:,}")
+    m2.metric("Held-out practice accuracy", f"{metrics['accuracy']*100:.1f}%")
+    m3.metric("Workflows completed", f"{metrics['complete_rate']*100:.1f}%")
+    st.caption("Evaluation uses 200 new random practice workflows over the same two known "
+               "task types. High scores here don't imply general computer control or "
+               "natural-language understanding.")
+    st.write("**Give AARON-1 a goal**")
+    with st.form("agency_goal"):
+        goal = st.selectbox("Goal", options=list(GOALS),
+                            format_func=lambda g: GOALS[g]["label"])
+        number_items = st.slider("Practice items", 3, 12, 6)
+        submitted = st.form_submit_button("▶ Let AARON-1 execute")
+    if submitted:
+        outcome = agent.do_goal(goal, count=number_items)
+        agent.save()
+        st.session_state["last_agency_result"] = outcome
+    outcome = st.session_state.get("last_agency_result")
+    if outcome:
+        summary = outcome["summary"]
+        st.success(f"Agent executed {summary['steps']} tool calls and "
+                   f"completed {summary['correct']}/{summary['items']} practice items correctly.")
+        st.dataframe(pd.DataFrame(outcome["trace"]), hide_index=True,
+                     use_container_width=True)
+        st.caption("The trace shows each observation, chosen tool, and environment feedback. "
+                   "The policy is updated from those rewards.")
+    st.divider()
+    st.write("**Continue training the SAME agent**")
+    st.caption("Training updates its saved policy, not a population of replacement agents. "
+               "This happens inside the current dashboard — no extra Terminal windows.")
+    amount = st.select_slider("Additional practice episodes",
+                              options=[100, 1000, 5000, 10000], value=5000)
+    if st.button("🧠 Train AARON-1", key="agency_train"):
+        with st.spinner("Running local reinforcement learning..."):
+            before = agent.evaluate(trials_per_goal=100)
+            info = agent.train(count=amount)
+            after = agent.evaluate(trials_per_goal=100)
+            agent.save()
+        st.success(f"Trained {info['episodes_added']:,} more episodes. "
+                   f"Accuracy {before['accuracy']:.1%} → {after['accuracy']:.1%}. "
+                   f"Saved permanently to your local checkpoint.")
+        st.rerun()
+    if agent.history:
+        chart_data = pd.DataFrame(agent.history).set_index("episode")
+        st.line_chart(chart_data[["train_accuracy"]], y_label="Training success fraction")
+    with st.expander("Inspect AARON-1's learned tool choices"):
+        rows = []
+        for state, scores in sorted(agent.q.items()):
+            if state.endswith("|done"):
+                continue
+            action = max(range(len(scores)), key=lambda idx: scores[idx])
+            rows.append({"Observed state": state, "Chosen tool": ACTION_LABELS[ACTIONS[action]],
+                         "Estimated action value": round(scores[action], 3)})
+        if rows:
+            st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+        st.caption("The values are learned Q-estimates for these states, not "
+                   "an explanation of unrestricted reasoning.")
 
 with st.expander("How the experiment works"):
     st.write("Two tabular reinforcement-learning policies share only a discrete signal. "
