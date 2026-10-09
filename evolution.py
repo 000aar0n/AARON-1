@@ -56,14 +56,44 @@ def fitness(genome):
                for target in range(N)) / N
 
 def mutate(parent, rng):
+    """Mutate scores and sometimes coordinate BOTH ends of a signal.
+
+    Independent weight mutations often get trapped at 7/8 because fixing the
+    last target requires changing its sender and receiver together.
+    """
     child = parent[:]
     for i in range(len(child)):
-        if rng.random() < MUTATION_RATE:
-            child[i] += rng.gauss(0, 0.6)
+        if rng.random() < MUTATION_RATE * 0.12:
+            child[i] += rng.gauss(0, 0.3)
+
+    if rng.random() < 0.40:
+        wrong = [target for target in range(N)
+                 if receive(child, decode(child, target)) != target]
+        used = {decode(child, target) for target in range(N)}
+        free = [symbol for symbol in range(N) if symbol not in used]
+        if wrong and free:
+            target = rng.choice(wrong)
+            symbol = rng.choice(free)
+            # Switch the sender to an unused symbol; teach receiver its meaning.
+            offset = target * N
+            child[offset + symbol] = max(child[offset:offset + N]) + 1.0
+            offset = N * N + symbol * N
+            child[offset + target] = max(child[offset:offset + N]) + 1.0
     return child
 
 def cross(a, b, rng):
-    return [x if rng.random() < 0.5 else y for x, y in zip(a, b)]
+    """Preserve most fully trained protocols; explore crossover occasionally."""
+    # Recombination of arbitrary symbolic conventions can be destructive.
+    if rng.random() < 0.85:
+        return a[:]
+    # Copy complete sender rows from the second parent; receiver stays paired
+    # to the first parent's protocol (offspring is evaluated, not assumed valid).
+    child = a[:]
+    for target in range(N):
+        if rng.random() < 0.15:
+            off = target * N
+            child[off:off + N] = b[off:off + N]
+    return child
 
 def generation(population, rng):
     ranked = sorted(population, key=fitness, reverse=True)
