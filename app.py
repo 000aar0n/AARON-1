@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 from individual import respond, history, vocabulary, symbolic_peer
 from avatar import render_face
-from agency import GOALS, ACTIONS, ACTION_LABELS, load_agent
+from agency import GOALS, ACTIONS, ACTION_LABELS, load_agent, preview_local_folder
 from personality import (get_profile, save_profile, teach_reply, learned_examples,
                          forget_example, ensure_brainrot_training, training_stats)
 
@@ -240,6 +240,31 @@ with tab4:
     if agent.history:
         chart_data = pd.DataFrame(agent.history).set_index("episode")
         st.line_chart(chart_data[["train_accuracy"]], y_label="Training success fraction")
+    with st.expander("Read-only preview: organize files in a permitted folder"):
+        st.caption("Optional file preview: AARON-1 reads filenames and extensions, "
+                   "then proposes destinations. It NEVER moves or edits files.")
+        preview_root = Path("data/agency_preview")
+        preview_root.mkdir(parents=True, exist_ok=True)
+        st.caption(f"Allowed preview root: {preview_root.resolve()}")
+        st.caption("Put sample files there in Finder first. Access is restricted "
+                   "to this directory unless the owner sets AARON_AGENCY_PREVIEW_ROOT.")
+        folder = st.text_input("Folder to preview",
+                               value=str(preview_root.resolve()),
+                               key="agency_preview_folder")
+        if st.button("Preview action plan (read-only)", key="agency_preview"):
+            try:
+                preview = preview_local_folder(folder, agent)
+                if preview["items"]:
+                    st.dataframe(pd.DataFrame(preview["items"]), hide_index=True,
+                                 use_container_width=True)
+                else:
+                    st.info("No supported files found in the permitted folder.")
+                if preview["truncated"]:
+                    st.warning("Only the first 40 entries were inspected.")
+                st.caption("Files changed: 0. Categories come from file extensions "
+                           "supplied by a deterministic inspection tool.")
+            except (OSError, ValueError) as exc:
+                st.error(str(exc))
     with st.expander("Inspect AARON-1's learned tool choices"):
         rows = []
         for state, scores in sorted(agent.q.items()):
