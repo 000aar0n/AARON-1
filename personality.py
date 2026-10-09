@@ -79,7 +79,7 @@ def ensure_brainrot_training(force=False):
 DATING_VERSION = "crush_rizz_lessons_v1"
 
 
-def ensure_dating_training():
+def ensure_dating_training(force=False):
     """Install the new add-on once, preserving existing taught replies and settings."""
     with connect() as cx:
         initialize(cx)
@@ -87,7 +87,7 @@ def ensure_dating_training():
             "SELECT value FROM personality_settings WHERE setting=?",
             (DATING_VERSION,),
         ).fetchone()
-        if already:
+        if already and not force:
             return 0
         before = cx.total_changes
         cx.executemany(
@@ -97,7 +97,7 @@ def ensure_dating_training():
         )
         count = cx.total_changes - before
         cx.execute(
-            "INSERT INTO personality_settings(setting,value) VALUES (?,?)",
+            "INSERT OR REPLACE INTO personality_settings(setting,value) VALUES (?,?)",
             (DATING_VERSION, "installed"),
         )
         cx.commit()
