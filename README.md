@@ -47,3 +47,30 @@ Each curriculum expansion initializes a fresh policy, while retaining the overal
 - `trainer.py` — continuous separate process, saves atomic checkpoints
 - `app.py` — read-only metrics and pause/resume dashboard
 - `requirements.txt` — web UI dependencies
+
+## 🧬 Evolution v0.2 (separate experiment)
+
+First pull the latest code:
+
+```bash
+cd ~/AARON-1
+git pull
+```
+
+Open a **third Terminal** in the same folder (your original `trainer.py` and `streamlit run app.py` can stay running):
+
+```bash
+cd ~/AARON-1
+source .venv/bin/activate
+python3 evolution.py
+```
+
+Open the **Evolution** tab of your existing Streamlit dashboard. You'll see the best and mean cooperation fitness for a population of 48 pairs, and you can pause the evolution worker. Stop the worker with Ctrl+C. Progress is saved separately in `data/evolution_checkpoint.json` and resumes automatically.
+
+To test the new engine:
+
+```bash
+python3 -m unittest test_evolution.py
+```
+
+**Scientific limitations:** Selection, mutation, crossover, and elitism are real genetic-algorithm mechanisms. The genomes encode lookup-score policies, not self-modifying neural networks; the eight tasks used to measure fitness are the same tasks used in selection. Thus improved fitness does not establish generalization, emergent grammar, or useful real-world intelligence. Those are future research steps. Keep both workers on your Mac; Streamlit Community Cloud will not connect to these local processes automatically.
