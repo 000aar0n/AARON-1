@@ -60,16 +60,16 @@ class AssistantTests(unittest.TestCase):
                            core.score_task(optional, today=date(2026, 10, 9)))
 
     def test_csv_import_is_repeatable(self):
-        content = b"Assignment,Due Date\\nRead chapter 3,10/20/2026\\nMath sheet,2026-10-21\\n"
+        content = b"Assignment,Due Date\nRead chapter 3,10/20/2026\nMath sheet,2026-10-21\n"
         self.assertEqual(core.parse_csv(content), 2)
         self.assertEqual(core.parse_csv(content), 0)
         self.assertEqual(len(core.list_tasks()), 2)
 
     def test_ics_import_is_repeatable(self):
-        ics = (b"BEGIN:VCALENDAR\\r\\nVERSION:2.0\\r\\n"
-               b"BEGIN:VEVENT\\r\\nUID:hw123\\r\\n"
-               b"DTSTART;VALUE=DATE:20261021\\r\\n"
-               b"SUMMARY:Practice geometry\\r\\nEND:VEVENT\\r\\nEND:VCALENDAR\\r\\n")
+        ics = (b"BEGIN:VCALENDAR\r\nVERSION:2.0\r\n"
+               b"BEGIN:VEVENT\r\nUID:hw123\r\n"
+               b"DTSTART;VALUE=DATE:20261021\r\n"
+               b"SUMMARY:Practice geometry\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n")
         self.assertEqual(core.parse_ics(ics), 1)
         self.assertEqual(core.parse_ics(ics), 0)
 
