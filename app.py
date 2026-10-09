@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 import pandas as pd
 import streamlit as st
+from individual import respond, history, vocabulary, symbolic_peer
 
 st.set_page_config(page_title="AARON-1 | Evolution Lab", page_icon="🧠", layout="wide")
 DATA = Path("data")
@@ -62,7 +63,7 @@ def monitor():
     st.caption("Agent A learns a symbol for each hidden target. Agent B learns to decode it. "
                "100% on known targets is not evidence of language understanding or generalization.")
 
-tab1, tab2 = st.tabs(["📡 Signal Learning", "🧬 Evolution"])
+tab1, tab2, tab3 = st.tabs(["📡 Signal Learning", "🧬 Evolution", "💬 AARON-1"])
 with tab1:
     monitor()
 with tab2:
@@ -99,6 +100,36 @@ with tab2:
                    "This is genuine genetic search on fixed policies, not open-ended evolution "
                    "or evidence of general intelligence.")
     evolution_monitor()
+with tab3:
+    st.subheader("Talk to AARON-1")
+    st.caption("No pretrained models or language-model APIs. This is a tiny symbolic learner with durable local SQLite memory — not free-form language understanding.")
+    st.info("Try: `my favorite food is ramen`, `what is my favorite food`, or `teach: sup = greeting`.")
+    for utterance, reply in history(15):
+        with st.chat_message("user"):
+            st.write(utterance)
+        with st.chat_message("assistant"):
+            st.write(reply)
+    msg = st.chat_input("Talk to your individual", key="aaron_chat")
+    if msg:
+        respond(msg)
+        st.rerun()
+    with st.expander("Vocabulary learned"):
+        words = vocabulary()
+        st.dataframe(pd.DataFrame(words, columns=["Expression", "Meaning"]),
+                     use_container_width=True, hide_index=True)
+    st.subheader("Communicate with another agent")
+    state = read(DATA / "checkpoint.json").get("pair", {})
+    n = int(state.get("n", 4))
+    target = st.selectbox("Location known only to sender", list(range(n)))
+    if st.button("Send learned symbol", key="peer_send"):
+        outcome = symbolic_peer(target)
+        if outcome is None:
+            st.warning("Start the original trainer first to create a checkpoint.")
+        else:
+            st.write(f"Sender transmits symbol #{outcome['signal']}; receiver decodes location #{outcome['decoded']}.")
+            st.success("Communication worked") if outcome["correct"] else st.error("They disagreed")
+    st.caption("The English chat and learned symbol protocol are currently separate systems. Later we can connect them through explicit grounded teaching tasks.")
+
 with st.expander("How the experiment works"):
     st.write("Two tabular reinforcement-learning policies share only a discrete signal. "
              "A receives the hidden target and chooses a signal. B sees the signal and "
