@@ -265,6 +265,58 @@ def load_agent():
     return AARONAgent(saved)
 
 
+
+READONLY_SUFFIXES = {
+    "document": {".pdf", ".txt", ".md", ".docx", ".doc", ".rtf", ".pptx", ".xlsx"},
+    "image": {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"},
+    "code": {".py", ".js", ".ts", ".sh", ".cpp", ".c", ".java", ".css", ".html", ".json", ".yaml"},
+}
+FOLDERS = {"file_docs": "Documents", "file_images": "Images", "file_code": "Code"}
+
+
+def preview_local_folder(folder, agent, limit=40):
+    """Read filenames/extensions only and use the learned policy for a proposed plan.
+
+    Never reads file contents; never creates, moves or deletes files. The user
+    explicitly supplies the local folder path. No recursive traversal/symlinks.
+    """
+    if not isinstance(agent, AARONAgent):
+        raise TypeError("Expected AARON-1 agent")
+    path = Path(folder).expanduser()
+    if not path.is_dir():
+        raise ValueError("Choose an existing folder on the machine running Streamlit")
+    if not 1 <= limit <= 100:
+        raise ValueError("Limit must be between 1 and 100")
+    results = []
+    files = sorted(path.iterdir(), key=lambda item: item.name.lower())
+    truncated = len(files) > limit
+    for item in files[:limit]:
+        if item.is_symlink() or not item.is_file():
+            continue
+        category = next((tag for tag, suffixes in READONLY_SUFFIXES.items()
+                         if item.suffix.lower() in suffixes), None)
+        if not category:
+            results.append({"name": item.name, "inspect": "extension not supported",
+                            "decision": "Leave untouched", "confidence": "n/a"})
+            continue
+        # Learned tool selection (not a hardcoded move): inspect first, then decide.
+        inspect_action = ACTIONS[agent.choose("sort_inbox|hidden", random.Random(17))]
+        if inspect_action != "inspect":
+            results.append({"name": item.name, "inspect": "not inspected",
+                            "decision": "No proposal: policy needs training",
+                            "confidence": "low"})
+            continue
+        action = ACTIONS[agent.choose("sort_inbox|" + category, random.Random(17))]
+        destination = FOLDERS.get(action)
+        results.append({"name": item.name,
+                        "inspect": f"extension suggests {category}",
+                        "decision": f"Would organize into {destination}" if destination else
+                                    "No supported destination",
+                        "confidence": "known category" if destination else "low"})
+    return {"folder": str(path), "items": results,
+            "truncated": truncated, "files_changed": 0}
+
+
 def main():
     parser = argparse.ArgumentParser(description="Train one AARON-1 agent on safe sandbox goals.")
     parser.add_argument("--episodes", type=int, default=10000)
