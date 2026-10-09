@@ -283,39 +283,57 @@ def parse_csv(data, source="blackbaud", max_rows=300):
 
 
 def concise_reply(message):
-    """Transparent small command interface; no LLM, no fake broad comprehension."""
+    """Small transparent command parser, without pretending to know English."""
     message = (message or "").strip()
     lower = message.lower().strip(" !?.")
     if not message:
         return "Tell me what you want to organize."
     if lower in ("hi", "hey", "hello", "yo"):
-        return "Hey! I can organize your tasks and, once connected, check your inbox."
-    if re.search(r"\b(assignments|homework|due|tasks|todo|to do)\b", lower):
+        return "Hey! What homework or to-dos should I help you organize?"
+
+    # Mutating commands must run before querying tasks; e.g. "add task math homework"
+    # must never accidentally trigger the "show homework" intent.
+    add = re.fullmatch(
+        r"(?:add|create) (?:task |todo )?(.+?)(?: due (\\d{4}-\\d\\d-\\d\\d))?",
+        lower, re.IGNORECASE
+    )
+    if add:
+        title, due = add.groups()
+        try:
+            add_task(title, due=due)
+        except ValueError as exc:
+            return str(exc)
+        return f"Added: {title}" + (f", due {due}" if due else "") + "."
+
+    fact = re.fullmatch(r"my ([\\w ]{2,80}) is (.{1,250})", lower)
+    question = re.fullmatch(r"what is my ([\\w ]{2,80})", lower)
+    if fact:
+        remember(fact.group(1), fact.group(2))
+        return f"I'll remember: your {fact.group(1)} is {fact.group(2)}."
+    if question:
+        value = recall(question.group(1))
+        return (f"Your {question.group(1)} is {value}." if value
+                else f"I don't know your {question.group(1)} yet.")
+
+    if re.search(r"\\b(assignments|homework|due|tasks|todo|to do)\\b", lower):
         tasks = ranked_tasks()[:5]
         if not tasks:
-            return ("I don't have any assignments yet. Add one below, or import your "
-                    "Blackbaud assignment calendar under Connections.")
-        lines = [f"{idx}. {x['title']}" + (f" — due {x['due']}" if x.get("due") else "")
-                 for idx, x in enumerate(tasks, 1)]
-        return "Here is what I'd work on first:\n" + "\n".join(lines)
-    match = re.match(r"^(?:add|remember|create) (?:task |todo )?(.+?)(?: due (\d{4}-\d\d-\d\d))?$",
-                     lower, re.IGNORECASE)
-    if match:
-        name, due = match.groups()
-        try:
-            add_task(name, due=due)
-        except ValueError as error:
-            return str(error)
-        return f"Added to your tasks: {name}" + (f" (due {due})" if due else "") + "."
-    if any(term in lower for term in ("email", "inbox", "mail")):
-        return ("Your inbox only becomes available after you authorize a read-only "
-                "email connection under Connections. I won't send or delete mail.")
-    if "learn" in lower or "train" in lower:
-        return ("Every time you mark a task important or not important, my priority "
-                "model updates. That's how I'm learning your priorities.")
-    if lower in ("who are you", "what can you do"):
-        return ("I'm AARON-1, a small local assistant. I keep your task list, learn "
-                "your priorities, and can read supported accounts after you connect them.")
-    return ("I'm still a small task-focused AI, not a conversational LLM. Try "
-            "'what homework is due', 'add task finish chemistry', or 'check my email'.")
+            return ("No assignments added yet. Create a task under Tasks or "
+                    "import an assignment file under Connect.")
+        return "Here's what I'd prioritize:\\n" + "\\n".join(
+            f"{idx}. {t['title']}" + (f" — due {t['due']}" if t.get("due") else "")
+            for idx, t in enumerate(tasks, 1)
+        )
 
+    if any(term in lower for term in ("email", "inbox", "gmail", "mail")):
+        return ("Gmail needs your permission under Connect before I can read "
+                "its latest messages. I'll never send or delete mail.")
+    if "learn" in lower or "train" in lower:
+        return ("Mark tasks as Important or Not urgent under Tasks. "
+                "My priority model learns from each decision.")
+    if lower in ("who are you", "what can you do"):
+        return ("I'm AARON-1, your small local assistant. I organize tasks, "
+                "learn which deadlines matter to you, and read your Gmail "
+                "after you authorize access.")
+    return ("I can't understand every request yet. Try 'what homework is due', "
+            "'add task finish chemistry', or 'check my email'.")
