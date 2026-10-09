@@ -11,7 +11,7 @@ import os
 import secrets
 import time
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
@@ -48,8 +48,12 @@ def store_client_upload(upload: bytes):
     web = obj.get("web") if isinstance(obj, dict) else None
     if not isinstance(web, dict) or not web.get("client_id") or not web.get("client_secret"):
         raise ValueError("Create a Web application OAuth client in Google Cloud, then upload its JSON")
-    if not str(web.get("auth_uri", "")).startswith("https://accounts.google.com"):
+    auth_url = urlparse(str(web.get("auth_uri", "")))
+    token_url = urlparse(str(web.get("token_uri", "")))
+    if auth_url.scheme != "https" or auth_url.hostname != "accounts.google.com":
         raise ValueError("Unrecognized Google authorization URL")
+    if token_url.scheme != "https" or token_url.hostname != "oauth2.googleapis.com":
+        raise ValueError("Unrecognized Google token URL")
     configured = web.get("redirect_uris") or []
     if REDIRECT_URI not in configured and REDIRECT_URI + "/" not in configured:
         raise ValueError("In Google Cloud, register http://localhost:8501 as an authorized redirect URI")
@@ -110,9 +114,16 @@ def finish_auth(query):
 
 def load_credentials():
     from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request
     if not connected():
         raise RuntimeError("Connect Gmail first")
-    return Credentials.from_authorized_user_file(str(TOKEN_FILE), scopes=SCOPES)
+    creds = Credentials.from_authorized_user_file(str(TOKEN_FILE), scopes=SCOPES)
+    if not creds.valid and creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+        secure_save(TOKEN_FILE, creds.to_json())
+    if not creds.valid:
+        raise RuntimeError("Gmail permission expired. Reconnect under Connect.")
+    return creds
 
 
 def gmail_service():
@@ -128,7 +139,6 @@ def check_account():
 
 def list_messages(search="in:inbox", max_results=15):
     """Fetch Gmail metadata and short snippets, never download full bodies."""
-    from googleapiclient.errors import HttpError
     max_results = max(1, min(30, int(max_results)))
     service = gmail_service()
     data = service.users().messages().list(userId="me", q=search, maxResults=max_results).execute()
