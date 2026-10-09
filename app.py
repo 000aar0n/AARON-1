@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 from individual import respond, history, vocabulary, symbolic_peer
+from avatar import render_face
 
 st.set_page_config(page_title="AARON-1 | Evolution Lab", page_icon="🧠", layout="wide")
 DATA = Path("data")
@@ -104,6 +105,8 @@ with tab3:
     st.subheader("Talk to AARON-1")
     st.caption("No pretrained models or language-model APIs. This is a tiny symbolic learner with durable local SQLite memory — not free-form language understanding.")
     st.info("Try: `my favorite food is ramen`, `what is my favorite food`, or `teach: sup = greeting`.")
+    prior = history(1)
+    render_face(prior[-1][1] if prior else "Hello! I am AARON-1. Teach me something!", key="individual")
     for utterance, reply in history(15):
         with st.chat_message("user"):
             st.write(utterance)
