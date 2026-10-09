@@ -126,3 +126,24 @@ To correct a response, fill in **When someone says…** and **AARON-1 should res
 **Limitations:** This is direct teaching and rule-based tone adaptation, not neural language training, self-awareness, or a copy of a real person's personality. The style sliders mainly affect existing supported intents; unfamiliar questions still need explicit corrections. No LLM or paid API.
 
 Run checks with `python3 -m unittest test_personality.py`.
+
+## 💀 MAX BRAINROT lesson pack (152 examples)
+
+As requested, AARON-1 now ships with **152 explicit cursed conversational examples** covering greetings, internet slang, NPC/aura/67/Ohio memes, Valorant, Buyntiq, school, and softer responses when someone is stressed. On first launch after `git pull`, the existing **💬 AARON-1** tab installs the lessons into the same local SQLite database and sets Energy, Slang, and Humor to 3/3. The robot and agent/evolution checkpoints are untouched.
+
+The training is deliberately simple: phrase-response teaching plus the existing strict near-duplicate matcher. **It is not neural training or general natural-language comprehension**. No LLMs and no APIs. The repo includes examples only; the live Mac's local database is not modified until the updated app runs.
+
+**Preservation rules:** User-taught example replies beat bundled examples. The initial install runs just once, so later edits or deletions stay changed and manually lowered sliders stay lowered. The **💀 MAX BRAINROT — reapply the training** button restores missing bundled lessons and resets the style sliders to max, but does **not** overwrite user-taught corrections. A collapsed **Browse and manage learned replies** toggle keeps 152 lessons from overwhelming the interface.
+
+Try messages like `am i cooked`, `what is rizz`, `i have homework`, `valorant`, `the code is broken`, `mango mango mango`, or `67`.
+
+To use the update in the **same dashboard** (no extra windows), stop Streamlit with Ctrl+C in the existing Terminal, then run:
+
+```bash
+cd ~/AARON-1
+git pull
+source .venv/bin/activate
+python3 -m streamlit run app.py
+```
+
+Run local checks using `python3 -m unittest test_personality.py test_brainrot.py`.
