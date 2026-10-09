@@ -147,3 +147,41 @@ python3 -m streamlit run app.py
 ```
 
 Run local checks using `python3 -m unittest test_personality.py test_brainrot.py`.
+
+## 🧠 AARON-1 Agentic Learning v0.1 — real Q-learning, no LLM
+
+This is a **new capability of the same persistent AARON-1**, not a new evolutionary population or replacement identity. The committed initial policy is at `models/agency_seed.json`. It was trained for **50,000 reinforcement-learning episodes / 510,199 tool actions** and, in an independent run of 1,000 newly randomized practice workflows using the same action/state categories, achieved **100% completion and 100% correct actions**. These results measure the deliberately small simulated tasks only and are NOT proof of general intelligence or open-ended problem solving.
+
+**Agent loop:** observe goal and current item → choose a learned tool → see feedback → update Q-values → persist. The trainable component is a goal-conditioned Q-table built from scratch, NOT an LLM, large neural network, or scripted decision mapping. The sandbox inspection tool supplies a category after inspecting an item; the agent learns when to inspect and which tool action to take based on that category. The policy does not understand arbitrary text or discover new categories by itself.
+
+Known practice goals:
+- **Organize a practice inbox:** inspect an item; choose Documents, Images, or Code
+- **Prioritize a practice to-do list:** inspect a task; choose Do Now, Schedule, or Backlog
+
+Open **🧠 Agency** in the existing Streamlit dashboard. Click **Let AARON-1 execute** to see the complete observation/action/reward trace, or **Train AARON-1** to update its original policy for another 100–10,000 episodes without a new Terminal. AARON-1's local policy is saved in ignored `data/agency_policy.json`; existing learning is NEVER replaced by `git pull`. You can also type **organize a practice inbox** or **prioritize practice tasks** into the AARON-1 chat to execute the simulated skills.
+
+**Read-only tool preview:** the Agency tab can list filenames/extensions in the restricted folder `data/agency_preview/` (create/use it via Finder) and use the learned policy to *propose* folders. It never reads contents, moves, deletes, or renames files. The default permitted root cannot be escaped with sibling paths or symlinks. The person running the server can explicitly set `AARON_AGENCY_PREVIEW_ROOT` if they wish to authorize a different preview folder; do not expose a publicly accessible Streamlit dashboard to an unrestricted root.
+
+### Continue training locally
+
+In your one existing Streamlit Terminal, stop the foreground app with **Ctrl+C**, then:
+
+```bash
+cd ~/AARON-1
+git pull
+source .venv/bin/activate
+python3 -m streamlit run app.py
+```
+
+Use the Agency tab to train and run goals — no separate training window needed.
+
+Alternatively, advanced users can run **CPU-only** training directly:
+
+```bash
+python3 agency.py --episodes 100000
+python3 -m unittest test_agency.py
+```
+
+The same script runs on Windows with Python 3.10+; it currently doesn't use or benefit from a GPU. A more capable neural agent could later use your gaming PC, but that would require a separate architecture, a task dataset, and proper independent evaluation. Neither this repo nor ChatGPT remotely accesses your PC.
+
+**Safety/limits:** AARON-1 cannot yet browse arbitrary sites, change real files, operate apps, edit repositories, or perform unapproved actions on its own. The practice policy only works within the two explicitly defined goals. Any future real-world actions should be tool-scoped and require permission for destructive changes. Persistent chat memory remains separate from the learned control policy.
