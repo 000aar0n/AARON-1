@@ -1,0 +1,28 @@
+{
+  "identity": "AARON-1",
+  "model": "online_logistic_task_priority",
+  "version": 1,
+  "weights": [
+    -4.158647755905448,
+    7.018474588094029,
+    6.927806216485971,
+    4.292678274641791,
+    1.631731589608783,
+    0.07239852502290009,
+    5.78245466052036
+  ],
+  "features": [
+    "bias",
+    "overdue",
+    "due_today",
+    "due_week",
+    "school",
+    "inbox",
+    "starred"
+  ],
+  "trained_examples": 60000,
+  "synthetic_holdout_examples": 8000,
+  "synthetic_holdout_accuracy": 0.888375,
+  "note": "Learned from synthetic deadline/urgency training examples; not real student data. Personal feedback refines locally.",
+  "feedback_count": 0
+}
