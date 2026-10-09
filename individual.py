@@ -57,6 +57,7 @@ def respond(message):
     """Handle conversation using saved examples first, then bounded symbolic rules."""
     # Import inside this function to keep the DB helpers independent of style code.
     from personality import ensure_brainrot_training, ensure_dating_training, learned_response, dating_context_reply, voice
+    from agency import load_agent, GOALS
 
     ensure_brainrot_training()
     ensure_dating_training()
@@ -65,6 +66,27 @@ def respond(message):
     msg = raw.lower().strip(" .!?")
     if not msg:
         return "Say something and I'll try to understand it."
+
+    practice_goals = {
+        "organize a practice inbox": "sort_inbox",
+        "sort a practice inbox": "sort_inbox",
+        "sort practice files": "sort_inbox",
+        "prioritize practice tasks": "triage_tasks",
+        "triage a practice task list": "triage_tasks",
+        "plan a practice todo list": "triage_tasks",
+    }
+    if msg in practice_goals:
+        agent = load_agent()
+        goal = practice_goals[msg]
+        outcome = agent.do_goal(goal, count=6)
+        agent.save()
+        result = outcome["summary"]
+        reply = (f"I ran my trained policy on a SIMULATED goal: "
+                 f"{GOALS[goal]['label']}. I chose {result['steps']} tool calls "
+                 f"and completed {result['correct']}/{result['items']} items. "
+                 "For the action-by-action trace, use the Agency tab.")
+        log(raw, reply)
+        return reply
 
     taught = learned_response(raw)
     if taught is not None:
