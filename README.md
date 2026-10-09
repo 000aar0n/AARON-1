@@ -74,3 +74,17 @@ python3 -m unittest test_evolution.py
 ```
 
 **Scientific limitations:** Selection, mutation, crossover, and elitism are real genetic-algorithm mechanisms. The genomes encode lookup-score policies, not self-modifying neural networks; the eight tasks used to measure fitness are the same tasks used in selection. Thus improved fitness does not establish generalization, emergent grammar, or useful real-world intelligence. Those are future research steps. Keep both workers on your Mac; Streamlit Community Cloud will not connect to these local processes automatically.
+
+## 💬 AARON-1 individual (no LLM)
+
+The **AARON-1** Streamlit tab provides an offline teachable chat system using only Python and SQLite. It remembers simple facts and user-taught word meanings across restarts. No Ollama, ChatGPT, APIs, pretrained language models, or GPU are required.
+
+To update on your Mac, run `cd ~/AARON-1 && git pull` and refresh the existing Streamlit page. The new tab includes examples and a separate trained-symbol channel for the sender and receiver agents.
+
+Example messages:
+- `my favorite food is ramen`
+- `what is my favorite food`
+- `teach: sup = greeting`
+- `sup`
+
+This version **does not** train neural language comprehension. Teaching a word stores a mapping; it does not magically give an AI natural-language understanding. Free-form conversation will be limited until we build grounded language-learning tasks that update a trainable model. Chat logs and taught information remain local in `data/aaron_individual.sqlite3`.
