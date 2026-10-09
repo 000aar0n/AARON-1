@@ -294,7 +294,7 @@ def concise_reply(message):
     # Mutating commands must run before querying tasks; e.g. "add task math homework"
     # must never accidentally trigger the "show homework" intent.
     add = re.fullmatch(
-        r"(?:add|create) (?:task |todo )?(.+?)(?: due (\\d{4}-\\d\\d-\\d\\d))?",
+        r"(?:add|create) (?:task |todo )?(.+?)(?: due (\d{4}-\d\d-\d\d))?",
         lower, re.IGNORECASE
     )
     if add:
@@ -305,8 +305,8 @@ def concise_reply(message):
             return str(exc)
         return f"Added: {title}" + (f", due {due}" if due else "") + "."
 
-    fact = re.fullmatch(r"my ([\\w ]{2,80}) is (.{1,250})", lower)
-    question = re.fullmatch(r"what is my ([\\w ]{2,80})", lower)
+    fact = re.fullmatch(r"my ([\w ]{2,80}) is (.{1,250})", lower)
+    question = re.fullmatch(r"what is my ([\w ]{2,80})", lower)
     if fact:
         remember(fact.group(1), fact.group(2))
         return f"I'll remember: your {fact.group(1)} is {fact.group(2)}."
@@ -315,12 +315,12 @@ def concise_reply(message):
         return (f"Your {question.group(1)} is {value}." if value
                 else f"I don't know your {question.group(1)} yet.")
 
-    if re.search(r"\\b(assignments|homework|due|tasks|todo|to do)\\b", lower):
+    if re.search(r"\b(assignments|homework|due|tasks|todo|to do)\b", lower):
         tasks = ranked_tasks()[:5]
         if not tasks:
             return ("No assignments added yet. Create a task under Tasks or "
                     "import an assignment file under Connect.")
-        return "Here's what I'd prioritize:\\n" + "\\n".join(
+        return "Here's what I'd prioritize:\n" + "\n".join(
             f"{idx}. {t['title']}" + (f" — due {t['due']}" if t.get("due") else "")
             for idx, t in enumerate(tasks, 1)
         )
