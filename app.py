@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 from individual import respond, history, vocabulary, symbolic_peer
 from avatar import render_face
+from personality import get_profile, save_profile, teach_reply, learned_examples, forget_example
 
 st.set_page_config(page_title="AARON-1 | Evolution Lab", page_icon="🧠", layout="wide")
 DATA = Path("data")
@@ -107,6 +108,51 @@ with tab3:
     st.info("Try: `my favorite food is ramen`, `what is my favorite food`, or `teach: sup = greeting`.")
     prior = history(1)
     render_face(prior[-1][1] if prior else "Hello! I am AARON-1. Teach me something!", key="individual")
+    with st.expander("🎭 Teach AARON-1 your personality", expanded=True):
+        st.caption("You're teaching it your conversational style, not turning it into you. All examples stay on this Mac in the local database.")
+        profile = get_profile()
+        with st.form("personality_style"):
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                energy = st.slider("Energy", 0, 3, int(profile["energy"]), help="0 = chill, 3 = hyper")
+            with c2:
+                slang = st.slider("Slang", 0, 3, int(profile["slang"]), help="0 = plain English, 3 = casual")
+            with c3:
+                humor = st.slider("Humor", 0, 3, int(profile["humor"]), help="0 = straightforward, 3 = playful")
+            phrases = st.text_input("Words you say (comma-separated)", value=profile["favorite_phrases"],
+                                    max_chars=120, placeholder="bro, gang, lowk")
+            if st.form_submit_button("Save my vibe"):
+                save_profile(energy, slang, humor, phrases)
+                st.success("Saved. Your next replies will use these preferences.")
+                st.rerun()
+        st.write("**Teach it how you'd reply**")
+        st.caption("An example teaches a specific response to a phrase (or a very similar phrase). "
+                   "It isn't general language training yet.")
+        latest = history(1)
+        with st.form("personality_correction", clear_on_submit=True):
+            example_input = st.text_input("When someone says…",
+                value=latest[-1][0] if latest else "",
+                placeholder="what's good", max_chars=300)
+            desired = st.text_area("AARON-1 should respond…",
+                placeholder="yoooo what’s good gang 😭", max_chars=1000)
+            if st.form_submit_button("Teach this reply"):
+                if teach_reply(example_input, desired):
+                    st.success("Saved! Try sending that phrase in chat.")
+                    st.rerun()
+                else:
+                    st.warning("Add both an example message and your preferred reply.")
+        examples = learned_examples()
+        if examples:
+            st.caption(f"{len(examples)} example replies learned")
+            with st.expander("View or forget learned replies"):
+                for i, (input_example, reply_example) in enumerate(examples):
+                    a, b = st.columns([5, 1])
+                    with a:
+                        st.write(f"**{input_example}** → {reply_example}")
+                    with b:
+                        if st.button("Forget", key=f"forget_example_{i}"):
+                            forget_example(input_example)
+                            st.rerun()
     for utterance, reply in history(15):
         with st.chat_message("user"):
             st.write(utterance)
