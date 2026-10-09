@@ -1,286 +1,281 @@
-"""Streamlit monitoring UI; trainer runs independently of this process."""
-import json
-import time
-from pathlib import Path
+"""AARON-1 — one assistant, one dashboard.
+
+No LLM, agent network, mock multi-agent population, or access without permission.
+"""
+from __future__ import annotations
+
+import html
+from datetime import date
+
 import pandas as pd
 import streamlit as st
-from individual import respond, history, vocabulary, symbolic_peer
+
+from assistant_core import (
+    add_task, concise_reply, connect, learn_priority, list_tasks, parse_csv,
+    parse_ics, ranked_tasks, score_task, update_task, load_weights,
+)
+from gmail_access import (
+    check_account, client_ready, connected, disconnect, finish_auth,
+    list_messages, make_auth_url, store_client_upload,
+)
 from avatar import render_face
-from agency import GOALS, ACTIONS, ACTION_LABELS, load_agent, preview_local_folder
-from personality import (get_profile, save_profile, teach_reply, learned_examples,
-                         forget_example, ensure_brainrot_training, training_stats)
 
-st.set_page_config(page_title="AARON-1 | Evolution Lab", page_icon="🧠", layout="wide")
-DATA = Path("data")
-DATA.mkdir(exist_ok=True)
-STATUS = DATA / "status.json"
-CONTROL = DATA / "control.json"
+st.set_page_config(page_title="AARON-1", page_icon="🤖", layout="centered")
 
-def read(path):
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
 
-def write_control(paused):
-    CONTROL.write_text(json.dumps({"paused": paused}), encoding="utf-8")
+def init_chat():
+    with connect() as db:
+        db.execute("""CREATE TABLE IF NOT EXISTS chat_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT NOT NULL,
+          message TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)""")
+        db.commit()
 
-st.title("🧠 AARON-1")
-st.caption("One persistent local agent · learned tools · memory · experiments")
-st.info("Agency training runs in this dashboard without extra windows. The other experiments require their existing local trainers. Streamlit Cloud cannot see Mac-local checkpoints.")
 
-@st.fragment(run_every="2s")
-def monitor():
-    data = read(STATUS)
-    control = read(CONTROL)
-    alive = data.get("running") and time.time() - data.get("updated_at", 0) < 12
-    left, right = st.columns([3, 1])
-    with left:
-        st.subheader("🟢 Trainer online" if alive else "⚪ Trainer offline")
-    with right:
-        paused = st.toggle("Pause local training", value=control.get("paused", False),
-                           disabled=not alive, key="pause")
-        if alive and paused != control.get("paused", False):
-            write_control(paused)
-    if not data:
-        st.warning("No checkpoints yet. Start `python3 trainer.py` in another terminal.")
-        st.code("python3 trainer.py", language="bash")
-        return
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Generations", data.get("generation", 0))
-    c2.metric("Training episodes", f"{data.get('total_episodes', 0):,}")
-    c3.metric("Signal vocabulary", data.get("symbols", 4))
-    c4.metric("Greedy success", f"{100*data.get('greedy_accuracy', 0):.0f}%")
-    st.caption(data.get("event", ""))
-    hist = pd.DataFrame(data.get("history", []))
-    if not hist.empty:
-        st.subheader("Learning progress")
-        st.line_chart(hist.set_index("generation")[["train_accuracy", "greedy_accuracy"]],
-                      y_label="Success fraction (0–1)")
-    st.subheader("Invented communication mapping")
-    mapping = data.get("mapping", [])
-    if mapping:
-        st.dataframe(pd.DataFrame(mapping).rename(columns={
-            "target": "Target location", "symbol": "Agent A sends",
-            "decoded": "Agent B guesses", "correct": "Success"
-        }), use_container_width=True, hide_index=True)
-    st.caption("Agent A learns a symbol for each hidden target. Agent B learns to decode it. "
-               "100% on known targets is not evidence of language understanding or generalization.")
+def write_chat(role, message):
+    with connect() as db:
+        db.execute("INSERT INTO chat_history(role, message) VALUES (?,?)",
+                   (role, str(message)[:6000]))
+        db.commit()
 
-tab4, tab3, tab1, tab2 = st.tabs(["🧠 Agency", "💬 AARON-1", "📡 Signal Learning", "🧬 Evolution"])
-with tab1:
-    monitor()
-with tab2:
-    st.subheader("Genetic Evolution Experiment")
-    st.caption("Independent population of 48 cooperating sender/receiver policy pairs. Selection, crossover, and mutation evolve discrete communication scores.")
-    @st.fragment(run_every="2s")
-    def evolution_monitor():
-        evo = read(DATA / "evolution_status.json")
-        ctl = read(DATA / "evolution_control.json")
-        online = evo.get("running") and time.time() - evo.get("updated_at", 0) < 12
-        st.write("🟢 Evolution trainer online" if online else "⚪ Evolution trainer offline")
-        if not evo:
-            st.info("Start the separate evolution engine in another Terminal: `python3 evolution.py`")
-            return
-        paused = st.toggle("Pause evolution", value=ctl.get("paused", False),
-                           disabled=not online, key="evolution_paused")
-        if online and paused != ctl.get("paused", False):
-            (DATA / "evolution_control.json").write_text(
-                json.dumps({"paused": paused}), encoding="utf-8")
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Generation", evo.get("generation", 0))
-        c2.metric("Population", evo.get("population_size", 0))
-        c3.metric("Best cooperation", f"{100*evo.get('best_fitness', 0):.1f}%")
-        c4.metric("Mean cooperation", f"{100*evo.get('mean_fitness', 0):.1f}%")
-        hist = pd.DataFrame(evo.get("history", []))
-        if not hist.empty:
-            st.line_chart(hist.set_index("generation")[["best_fitness", "mean_fitness"]],
-                          y_label="Fitness (0–1)")
-        mapping = evo.get("mapping", [])
-        if mapping:
-            st.subheader("Top agent pair's code")
-            st.dataframe(mapping, use_container_width=True, hide_index=True)
-        st.caption("Fitness is success on the same eight target states used for selection. "
-                   "This is genuine genetic search on fixed policies, not open-ended evolution "
-                   "or evidence of general intelligence.")
-    evolution_monitor()
-with tab3:
-    ensure_brainrot_training()
-    st.subheader("Talk to AARON-1")
-    st.caption("No pretrained models or language-model APIs. This is a tiny symbolic learner with durable local SQLite memory — not free-form language understanding.")
-    st.info("Try: `am i cooked`, `what is rizz`, `valorant`, `67`, or `my favorite food is ramen`.")
-    prior = history(1)
-    render_face(prior[-1][1] if prior else "Hello! I am AARON-1. Teach me something!", key="individual")
-    with st.expander("🎭 Teach AARON-1 your personality", expanded=True):
-        st.caption("You're teaching it your conversational style, not turning it into you. All examples stay on this Mac in the local database.")
-        stats = training_stats()
-        st.write(f"🧠 **BRAINROT SCHOOL:** {stats['examples']} saved responses, "
-                 f"{stats['bundled']} bundled lessons. Maximum slang is preloaded.")
-        if st.button("💀 MAX BRAINROT — reapply training", key="max_brainrot"):
-            added = ensure_brainrot_training(force=True)
-            st.success(f"BRAINROT RESTORED 😭 {added} missing lessons added; your corrections are safe.")
-            st.rerun()
-        profile = get_profile()
-        with st.form("personality_style"):
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                energy = st.slider("Energy", 0, 3, int(profile["energy"]), help="0 = chill, 3 = hyper")
-            with c2:
-                slang = st.slider("Slang", 0, 3, int(profile["slang"]), help="0 = plain English, 3 = casual")
-            with c3:
-                humor = st.slider("Humor", 0, 3, int(profile["humor"]), help="0 = straightforward, 3 = playful")
-            phrases = st.text_input("Words you say (comma-separated)", value=profile["favorite_phrases"],
-                                    max_chars=120, placeholder="bro, gang, lowk")
-            if st.form_submit_button("Save my vibe"):
-                save_profile(energy, slang, humor, phrases)
-                st.success("Saved. Your next replies will use these preferences.")
-                st.rerun()
-        st.write("**Teach it how you'd reply**")
-        st.caption("An example teaches a specific response to a phrase (or a very similar phrase). "
-                   "It isn't general language training yet.")
-        latest = history(1)
-        with st.form("personality_correction", clear_on_submit=True):
-            example_input = st.text_input("When someone says…",
-                value=latest[-1][0] if latest else "",
-                placeholder="what's good", max_chars=300)
-            desired = st.text_area("AARON-1 should respond…",
-                placeholder="yoooo what’s good gang 😭", max_chars=1000)
-            if st.form_submit_button("Teach this reply"):
-                if teach_reply(example_input, desired):
-                    st.success("Saved! Try sending that phrase in chat.")
-                    st.rerun()
-                else:
-                    st.warning("Add both an example message and your preferred reply.")
-        examples = learned_examples()
-        if examples:
-            st.caption(f"{len(examples)} total response examples. Your new corrections take priority over bundled lessons.")
-            if st.toggle("Browse and manage learned replies", value=False, key="show_training_replies"):
-                st.dataframe(pd.DataFrame(examples, columns=["Message", "Learned response"]),
-                             height=240, use_container_width=True, hide_index=True)
-                selected = st.selectbox("Select one to forget", [p for p, _ in examples],
-                                        key="forget_brainrot_reply")
-                if st.button("Forget selected reply", key="forget_chosen_reply"):
-                    forget_example(selected)
-                    st.rerun()
-    for utterance, reply in history(15):
-        with st.chat_message("user"):
-            st.write(utterance)
-        with st.chat_message("assistant"):
-            st.write(reply)
-    msg = st.chat_input("Talk to your individual", key="aaron_chat")
-    if msg:
-        respond(msg)
-        st.rerun()
-    with st.expander("Vocabulary learned"):
-        words = vocabulary()
-        st.dataframe(pd.DataFrame(words, columns=["Expression", "Meaning"]),
-                     use_container_width=True, hide_index=True)
-    st.subheader("Communicate with another agent")
-    state = read(DATA / "checkpoint.json").get("pair", {})
-    n = int(state.get("n", 4))
-    target = st.selectbox("Location known only to sender", list(range(n)))
-    if st.button("Send learned symbol", key="peer_send"):
-        outcome = symbolic_peer(target)
-        if outcome is None:
-            st.warning("Start the original trainer first to create a checkpoint.")
-        else:
-            st.write(f"Sender transmits symbol #{outcome['signal']}; receiver decodes location #{outcome['decoded']}.")
-            st.success("Communication worked") if outcome["correct"] else st.error("They disagreed")
-    st.caption("The English chat and learned symbol protocol are currently separate systems. Later we can connect them through explicit grounded teaching tasks.")
 
-with tab4:
-    st.subheader("AARON-1 · Agency Lab")
-    st.caption("An actual trained Q-learning policy chooses tools, observes results, "
-               "gets rewards, and keeps learning. The environments are safe simulations: "
-               "no real folders, emails, apps, or accounts are touched.")
-    agent = load_agent()
-    metrics = agent.evaluate(trials_per_goal=100)
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Lifetime training episodes", f"{agent.episodes:,}")
-    m2.metric("Held-out practice accuracy", f"{metrics['accuracy']*100:.1f}%")
-    m3.metric("Workflows completed", f"{metrics['complete_rate']*100:.1f}%")
-    st.caption("Evaluation uses 200 new random practice workflows over the same two known "
-               "task types. High scores here don't imply general computer control or "
-               "natural-language understanding.")
-    st.write("**Give AARON-1 a goal**")
-    with st.form("agency_goal"):
-        goal = st.selectbox("Goal", options=list(GOALS),
-                            format_func=lambda g: GOALS[g]["label"])
-        number_items = st.slider("Practice items", 3, 12, 6)
-        submitted = st.form_submit_button("▶ Let AARON-1 execute")
-    if submitted:
-        outcome = agent.do_goal(goal, count=number_items)
-        agent.save()
-        st.session_state["last_agency_result"] = outcome
-    outcome = st.session_state.get("last_agency_result")
-    if outcome:
-        summary = outcome["summary"]
-        st.success(f"Agent executed {summary['steps']} tool calls and "
-                   f"completed {summary['correct']}/{summary['items']} practice items correctly.")
-        st.dataframe(pd.DataFrame(outcome["trace"]), hide_index=True,
-                     use_container_width=True)
-        st.caption("The trace shows each observation, chosen tool, and environment feedback. "
-                   "The policy is updated from those rewards.")
-    st.divider()
-    st.write("**Continue training the SAME agent**")
-    st.caption("Training updates its saved policy, not a population of replacement agents. "
-               "This happens inside the current dashboard — no extra Terminal windows.")
-    amount = st.select_slider("Additional practice episodes",
-                              options=[100, 1000, 5000, 10000], value=5000)
-    if st.button("🧠 Train AARON-1", key="agency_train"):
-        with st.spinner("Running local reinforcement learning..."):
-            before = agent.evaluate(trials_per_goal=100)
-            info = agent.train(count=amount)
-            after = agent.evaluate(trials_per_goal=100)
-            agent.save()
-        st.success(f"Trained {info['episodes_added']:,} more episodes. "
-                   f"Accuracy {before['accuracy']:.1%} → {after['accuracy']:.1%}. "
-                   f"Saved permanently to your local checkpoint.")
-        st.rerun()
-    if agent.history:
-        chart_data = pd.DataFrame(agent.history).set_index("episode")
-        st.line_chart(chart_data[["train_accuracy"]], y_label="Training success fraction")
-    with st.expander("Read-only preview: organize files in a permitted folder"):
-        st.caption("Optional file preview: AARON-1 reads filenames and extensions, "
-                   "then proposes destinations. It NEVER moves or edits files.")
-        preview_root = Path("data/agency_preview")
-        preview_root.mkdir(parents=True, exist_ok=True)
-        st.caption(f"Allowed preview root: {preview_root.resolve()}")
-        st.caption("Put sample files there in Finder first. Access is restricted "
-                   "to this directory unless the owner sets AARON_AGENCY_PREVIEW_ROOT.")
-        folder = st.text_input("Folder to preview",
-                               value=str(preview_root.resolve()),
-                               key="agency_preview_folder")
-        if st.button("Preview action plan (read-only)", key="agency_preview"):
+def messages(limit=25):
+    with connect() as db:
+        return [dict(x) for x in db.execute(
+            "SELECT role,message FROM (SELECT id,role,message FROM chat_history "
+            "ORDER BY id DESC LIMIT ?) ORDER BY id ASC", (limit,)
+        )]
+
+
+def answer(message):
+    lower = message.lower()
+    if any(word in lower for word in ("email", "inbox", "gmail", "mail")):
+        if not connected():
+            return ("Gmail isn't connected yet. Open Connect, authorize your Gmail "
+                    "account, then ask me again. I can only read messages.")
+        try:
+            recent = list_messages(search="in:inbox", max_results=5)
+            if not recent:
+                return "Your inbox has no messages matching the current search."
+            lines = [f"• {item['subject']} — {item['from']}" for item in recent]
+            return "Here are the latest inbox subjects:\n" + "\n".join(lines)
+        except Exception:
+            return ("I couldn't load Gmail. Reconnect in the Connect tab if "
+                    "your authorization has expired.")
+    return concise_reply(message)
+
+
+def render_tasks():
+    st.subheader("Your assignments & to-dos")
+    st.caption("Add assignments manually or import a calendar under Connect. "
+               "AARON-1 learns what's important from your feedback.")
+
+    with st.form("new_task", clear_on_submit=True):
+        title = st.text_input("What do you need to do?", placeholder="Finish chemistry problems")
+        due = st.text_input("Due date (optional)", placeholder="YYYY-MM-DD")
+        if st.form_submit_button("Add task", type="primary"):
             try:
-                preview = preview_local_folder(folder, agent)
-                if preview["items"]:
-                    st.dataframe(pd.DataFrame(preview["items"]), hide_index=True,
-                                 use_container_width=True)
-                else:
-                    st.info("No supported files found in the permitted folder.")
-                if preview["truncated"]:
-                    st.warning("Only the first 40 entries were inspected.")
-                st.caption("Files changed: 0. Categories come from file extensions "
-                           "supplied by a deterministic inspection tool.")
-            except (OSError, ValueError) as exc:
+                add_task(title, due=due or None)
+                st.rerun()
+            except ValueError as exc:
                 st.error(str(exc))
-    with st.expander("Inspect AARON-1's learned tool choices"):
-        rows = []
-        for state, scores in sorted(agent.q.items()):
-            if state.endswith("|done"):
-                continue
-            action = max(range(len(scores)), key=lambda idx: scores[idx])
-            rows.append({"Observed state": state, "Chosen tool": ACTION_LABELS[ACTIONS[action]],
-                         "Estimated action value": round(scores[action], 3)})
-        if rows:
-            st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
-        st.caption("The values are learned Q-estimates for these states, not "
-                   "an explanation of unrestricted reasoning.")
+    rows = ranked_tasks()
+    if not rows:
+        st.info("No open tasks yet. Add one above or import your assignment calendar.")
+    for task in rows[:80]:
+        with st.container(border=True):
+            left, right = st.columns([4, 1])
+            with left:
+                st.markdown(f"**{task['title']}**")
+                detail = []
+                if task.get("due"):
+                    detail.append("Due " + task["due"])
+                if task.get("source") != "manual":
+                    detail.append("From " + task["source"].capitalize())
+                if detail:
+                    st.caption(" · ".join(detail))
+            with right:
+                st.caption(f"Priority {int(score_task(task)*100)}%")
+            c1, c2, c3 = st.columns([1, 1, 1])
+            if c1.button("✓ Done", key="done_" + task["id"]):
+                update_task(task["id"], completed=True)
+                st.rerun()
+            if c2.button("↑ Important", key="important_" + task["id"]):
+                learn_priority(task["id"], True)
+                st.rerun()
+            if c3.button("↓ Not urgent", key="not_" + task["id"]):
+                learn_priority(task["id"], False)
+                st.rerun()
+    st.caption("Importance labels train a small scoring model; it won't complete "
+               "homework or submit work automatically.")
+    with st.expander("Completed tasks"):
+        completed = [t for t in list_tasks(include_completed=True) if t["completed"]]
+        if not completed:
+            st.write("Nothing completed yet.")
+        for t in completed:
+            c1, c2 = st.columns([4, 1])
+            c1.write(t["title"])
+            if c2.button("Reopen", key="reopen_" + t["id"]):
+                update_task(t["id"], completed=False)
+                st.rerun()
 
-with st.expander("How the experiment works"):
-    st.write("Two tabular reinforcement-learning policies share only a discrete signal. "
-             "A receives the hidden target and chooses a signal. B sees the signal and "
-             "chooses a target. Both receive the same reward. The task gradually grows "
-             "from four to eight targets after consecutive perfect evaluations.")
-    st.write("There are no language models, no API fees, and no automatic modification of your code.")
+
+def render_connections():
+    st.subheader("Connect your accounts")
+    st.caption("Nothing is connected until you authorize it. "
+               "No password sharing, no sending mail, no deleting mail.")
+
+    with st.container(border=True):
+        st.markdown("#### ✉️ Gmail")
+        st.caption("Personal Gmail is fine. Read-only access to inbox metadata "
+                   "and message snippets, approved by you through Google.")
+        if connected():
+            try:
+                st.success("Connected: " + check_account())
+            except Exception:
+                st.warning("Gmail authorization is saved but needs refreshing.")
+            if st.button("Disconnect Gmail", key="disconnect_gmail"):
+                disconnect()
+                st.session_state.pop("gmail_view", None)
+                st.rerun()
+            if st.button("Check latest emails", type="primary", key="check_mail"):
+                try:
+                    st.session_state["gmail_view"] = list_messages("in:inbox", 15)
+                except Exception:
+                    st.error("Gmail could not be read. Your token may have expired.")
+            if st.button("Find assignment-related emails", key="find_school_mail"):
+                try:
+                    st.session_state["gmail_view"] = list_messages(
+                        "newer_than:90d {assignment homework blackbaud deadline}", 20
+                    )
+                except Exception:
+                    st.error("Could not search Gmail. Check your connection.")
+            if "gmail_view" in st.session_state:
+                emails = st.session_state["gmail_view"]
+                if not emails:
+                    st.info("No matching emails.")
+                for mail in emails:
+                    with st.container(border=True):
+                        st.markdown(f"**{mail['subject']}**")
+                        st.caption(f"{mail['from']} · {mail['date']}")
+                        st.write(mail["snippet"])
+                        if st.button("Add subject as task", key="mailtask_" + mail["id"]):
+                            _, added = add_task(mail["subject"], source="email",
+                                                notes=mail["snippet"],
+                                                external_id=mail["id"])
+                            st.toast("Added to tasks" if added else "Already added")
+        else:
+            if "code" in st.query_params or "error" in st.query_params:
+                try:
+                    finish_auth(st.query_params.to_dict())
+                    st.query_params.clear()
+                    st.success("Gmail successfully connected!")
+                    st.rerun()
+                except Exception as exc:
+                    st.query_params.clear()
+                    st.error(f"Google authorization wasn't completed: {exc}")
+            if not client_ready():
+                st.info("One-time Google setup: create a Google Cloud OAuth "
+                        "**Web application** client for the Gmail API, enable the Gmail API, "
+                        "add your Gmail as a test user if required, and register "
+                        "http://localhost:8501 as the authorized redirect URI.")
+                st.caption("Download its JSON credentials and upload them here. "
+                           "They stay only on your Mac in the gitignored data folder.")
+                uploaded = st.file_uploader("Upload Google OAuth client JSON",
+                                            type=["json"], key="gmail_json")
+                if uploaded is not None and st.button("Save Google connection setup"):
+                    try:
+                        store_client_upload(uploaded.getvalue())
+                        st.success("Setup saved. You can now authorize Gmail.")
+                        st.rerun()
+                    except ValueError as exc:
+                        st.error(str(exc))
+            else:
+                try:
+                    url = make_auth_url() if st.button("Start Gmail authorization", type="primary") else None
+                    if url:
+                        # Same-tab navigation: the OAuth callback returns to this Streamlit app.
+                        st.markdown(
+                            '<a href="' + html.escape(url, quote=True) +
+                            '" target="_self">Continue to Google authorization →</a>',
+                            unsafe_allow_html=True,
+                        )
+                except Exception:
+                    st.error("Could not start Google authentication. Check OAuth settings.")
+
+    with st.container(border=True):
+        st.markdown("#### 📚 School assignments")
+        st.caption("For Blackbaud, export an assignment calendar (ICS) or CSV "
+                   "if your school makes one available. This does not sign in to Blackbaud.")
+        uploaded = st.file_uploader("Import school assignment file",
+                                    type=["ics", "csv"], key="school_file")
+        if uploaded is not None and st.button("Import assignments", type="primary"):
+            try:
+                raw = uploaded.getvalue()
+                count = (parse_ics(raw) if uploaded.name.lower().endswith(".ics")
+                         else parse_csv(raw))
+                st.success(f"Imported {count} new assignments. Duplicates skipped.")
+            except Exception as exc:
+                st.error(f"Could not import file: {exc}")
+        st.caption("Direct Blackbaud account sync is not connected. "
+                   "We'll need school-supported authorization before adding it.")
+
+    with st.expander("Privacy & permissions"):
+        st.write("Gmail permission requested: gmail.readonly. "
+                 "AARON-1 cannot send mail or delete messages. "
+                 "The app reads basic headers/snippets only when asked. "
+                 "Tokens remain local in data/ and are excluded from GitHub. "
+                 "Never upload Google passwords or private keys to the repository.")
+
+
+def render_chat():
+    st.subheader("Ask AARON-1")
+    with st.expander("🤖 Show robot", expanded=False):
+        history = messages(1)
+        last = history[-1]["message"] if history and history[-1]["role"] == "assistant" else "Hi. What can I help with?"
+        render_face(last, key="home")
+    st.caption("One assistant, not a network. It remembers tasks and learns "
+               "your priorities. Natural-language skills are still limited.")
+    for item in messages():
+        with st.chat_message(item["role"]):
+            st.markdown(item["message"])
+    prompt = st.chat_input("Ask about homework, email, or add a task...")
+    if prompt:
+        write_chat("user", prompt)
+        reply = answer(prompt)
+        write_chat("assistant", reply)
+        st.rerun()
+    if not messages():
+        st.write("Try **what homework is due**, **add task read chapter 3**, "
+                 "or **check my email**.")
+
+
+def main():
+    init_chat()
+    st.title("🤖 AARON-1")
+    st.caption("Your personal learning assistant · Local-first · No LLM")
+
+    # OAuth query params might arrive on any tab: process and clear them globally.
+    if "code" in st.query_params or "error" in st.query_params:
+        try:
+            finish_auth(st.query_params.to_dict())
+            st.query_params.clear()
+            st.toast("Gmail connected")
+        except Exception as exc:
+            st.query_params.clear()
+            st.error(f"Gmail connection failed: {exc}")
+
+    chat_tab, task_tab, connection_tab = st.tabs(["💬 Chat", "✅ Tasks", "🔗 Connect"])
+    with chat_tab:
+        render_chat()
+    with task_tab:
+        render_tasks()
+    with connection_tab:
+        render_connections()
+
+    _, n = load_weights()
+    st.caption(f"🧠 AARON-1 has learned from {n} priority decisions. "
+               "Your files and saved memories stay on this Mac.")
+
+
+if __name__ == "__main__":
+    main()
