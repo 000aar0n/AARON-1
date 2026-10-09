@@ -129,10 +129,12 @@ def render_connections():
         st.caption("Personal Gmail is fine. Read-only access to inbox metadata "
                    "and message snippets, approved by you through Google.")
         if connected():
-            try:
-                st.success("Connected: " + check_account())
-            except Exception:
-                st.warning("Gmail authorization is saved but needs refreshing.")
+            st.success("Gmail authorization saved · read-only")
+            if st.button("Check connected account", key="check_account"):
+                try:
+                    st.success("Account: " + check_account())
+                except Exception:
+                    st.warning("The Gmail connection may need refreshing.")
             if st.button("Disconnect Gmail", key="disconnect_gmail"):
                 disconnect()
                 st.session_state.pop("gmail_view", None)
@@ -251,6 +253,8 @@ def render_chat():
 
 def main():
     init_chat()
+    from assistant_core import migrate_legacy_facts
+    migrate_legacy_facts()
     st.title("🤖 AARON-1")
     st.caption("Your personal learning assistant · Local-first · No LLM")
 
