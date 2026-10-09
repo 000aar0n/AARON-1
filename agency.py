@@ -282,7 +282,11 @@ def preview_local_folder(folder, agent, limit=40):
     """
     if not isinstance(agent, AARONAgent):
         raise TypeError("Expected AARON-1 agent")
-    path = Path(folder).expanduser()
+    allowed_root = Path(os.environ.get("AARON_AGENCY_PREVIEW_ROOT",
+                                       str(HERE / "data" / "agency_preview"))).expanduser().resolve()
+    path = Path(folder).expanduser().resolve()
+    if not path.is_relative_to(allowed_root):
+        raise ValueError("Folder is outside the explicitly allowed preview directory")
     if not path.is_dir():
         raise ValueError("Choose an existing folder on the machine running Streamlit")
     if not 1 <= limit <= 100:
