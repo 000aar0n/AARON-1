@@ -6,6 +6,7 @@ same local SQLite DB as the existing individual, without replacing its memory.
 import difflib
 import re
 from individual import connect
+from brainrot_corpus import BRAINROT_EXAMPLES
 
 DEFAULTS = {
     "energy": "2",
@@ -28,6 +29,61 @@ def initialize(cx):
         "CREATE TABLE IF NOT EXISTS reply_examples "
         "(prompt TEXT PRIMARY KEY, response TEXT NOT NULL)"
     )
+
+
+BRAINROT_VERSION = "brainrot_training_v1"
+BRAINROT_WORDS = "bro, gang, lowk, cooked, lock in, aura, sigma, W, 67"
+
+
+def ensure_brainrot_training(force=False):
+    """Install the bundled example lesson once; never replace user-taught replies.
+
+    Uses only SQLite and an explicit phrase/response corpus. This is symbolic
+    teaching by demonstration, not neural training or general intelligence.
+    When force=True, restore missing seed examples and max out style sliders,
+    but still preserve corrected replies the user already taught.
+    """
+    with connect() as cx:
+        initialize(cx)
+        row = cx.execute(
+            "SELECT value FROM personality_settings WHERE setting=?",
+            (BRAINROT_VERSION,),
+        ).fetchone()
+        if row and not force:
+            return 0
+
+        before = cx.total_changes
+        # Ignore collisions: a user's previously corrected reply always wins.
+        cx.executemany(
+            "INSERT OR IGNORE INTO reply_examples(prompt,response) VALUES (?,?)",
+            [(normalized(prompt)[:300], response[:1000])
+             for prompt, response in BRAINROT_EXAMPLES if normalized(prompt)],
+        )
+        added = cx.total_changes - before
+        cx.executemany(
+            "INSERT OR REPLACE INTO personality_settings(setting,value) VALUES (?,?)",
+            [
+                ("energy", "3"),
+                ("slang", "3"),
+                ("humor", "3"),
+                ("favorite_phrases", BRAINROT_WORDS),
+                (BRAINROT_VERSION, "installed"),
+            ],
+        )
+        cx.commit()
+        return added
+
+
+def training_stats():
+    """Return installed example count and whether the initial lesson ran."""
+    with connect() as cx:
+        initialize(cx)
+        count = cx.execute("SELECT COUNT(*) FROM reply_examples").fetchone()[0]
+        installed = cx.execute(
+            "SELECT 1 FROM personality_settings WHERE setting=?",
+            (BRAINROT_VERSION,),
+        ).fetchone() is not None
+    return {"examples": count, "brainrot_installed": installed, "bundled": len(BRAINROT_EXAMPLES)}
 
 
 def get_profile():
