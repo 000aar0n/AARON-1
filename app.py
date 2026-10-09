@@ -144,7 +144,7 @@ with tab3:
         examples = learned_examples()
         if examples:
             st.caption(f"{len(examples)} example replies learned")
-            with st.expander("View or forget learned replies"):
+            with st.container(border=True):
                 for i, (input_example, reply_example) in enumerate(examples):
                     a, b = st.columns([5, 1])
                     with a:
