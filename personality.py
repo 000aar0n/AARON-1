@@ -104,6 +104,32 @@ def ensure_dating_training():
         return count
 
 
+
+def dating_context_reply(message):
+    """Topic-specific fallback for variations not in the example corpus."""
+    key = normalized(message)
+    words = set(key.split())
+    if not words:
+        return None
+    if "blocked" in words or "rejected" in words or "said no" in key:
+        return "rough, gang 💔 respect the boundary and give her space. no chasing."
+    if "abg" in words or "abgs" in words:
+        if "how" in words or "where" in words:
+            return "ABG CRUSH ARC 😭 mutual friends and shared interests are the move; talk to her as an individual."
+        return "BRO THE ABG LORE IS DEVELOPING 😭 are y'all talking or is it pure eye contact?"
+    if "cracking" in words and ("girls" in words or "women" in words):
+        return "BRO'S IN THE RIZZ LAB 💀 what's actually happening in the talking stage?"
+    if "crush" in words or ("like" in words and "her" in words):
+        return "THE CRUSH ARC 😭 what's the context, gang? gimme the lore."
+    if "delivered" in words or "ghosted" in words:
+        return "BRO STOP ANALYZING THE TIMESTAMPS 😭 give it some space and don't spam."
+    if "fumbled" in words or "fumble" in words:
+        return "NAHHHH 💀 the rizz play got dropped. what happened?"
+    if "rizz" in words and ("her" in words or "girl" in words):
+        return "RIZZ STRATEGY 😭 be playful, listen, and see if the energy's mutual."
+    return None
+
+
 def training_stats():
     """Return installed example count and whether the initial lesson ran."""
     with connect() as cx:
