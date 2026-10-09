@@ -26,8 +26,8 @@ def write_control(paused):
     CONTROL.write_text(json.dumps({"paused": paused}), encoding="utf-8")
 
 st.title("🧠 AARON-1")
-st.caption("Cooperative agent evolution laboratory · Local-first")
-st.info("The trainer is separate from Streamlit. Start it in Terminal with `python3 trainer.py`. This dashboard can also run on Streamlit Cloud in read-only demo mode, but cloud training is not continuous or synced to your Mac.")
+st.caption("One persistent local agent · learned tools · memory · experiments")
+st.info("Agency training runs in this dashboard without extra windows. The other experiments require their existing local trainers. Streamlit Cloud cannot see Mac-local checkpoints.")
 
 @st.fragment(run_every="2s")
 def monitor():
@@ -67,7 +67,7 @@ def monitor():
     st.caption("Agent A learns a symbol for each hidden target. Agent B learns to decode it. "
                "100% on known targets is not evidence of language understanding or generalization.")
 
-tab1, tab2, tab3, tab4 = st.tabs(["📡 Signal Learning", "🧬 Evolution", "💬 AARON-1", "🧠 Agency"])
+tab4, tab3, tab1, tab2 = st.tabs(["🧠 Agency", "💬 AARON-1", "📡 Signal Learning", "🧬 Evolution"])
 with tab1:
     monitor()
 with tab2:
