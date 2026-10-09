@@ -107,11 +107,18 @@ with tab3:
     ensure_brainrot_training()
     st.subheader("Talk to AARON-1")
     st.caption("No pretrained models or language-model APIs. This is a tiny symbolic learner with durable local SQLite memory — not free-form language understanding.")
-    st.info("Try: `my favorite food is ramen`, `what is my favorite food`, or `teach: sup = greeting`.")
+    st.info("Try: `am i cooked`, `what is rizz`, `valorant`, `67`, or `my favorite food is ramen`.")
     prior = history(1)
     render_face(prior[-1][1] if prior else "Hello! I am AARON-1. Teach me something!", key="individual")
     with st.expander("🎭 Teach AARON-1 your personality", expanded=True):
         st.caption("You're teaching it your conversational style, not turning it into you. All examples stay on this Mac in the local database.")
+        stats = training_stats()
+        st.write(f"🧠 **BRAINROT SCHOOL:** {stats['examples']} saved responses, "
+                 f"{stats['bundled']} bundled lessons. Maximum slang is preloaded.")
+        if st.button("💀 MAX BRAINROT — reapply training", key="max_brainrot"):
+            added = ensure_brainrot_training(force=True)
+            st.success(f"BRAINROT RESTORED 😭 {added} missing lessons added; your corrections are safe.")
+            st.rerun()
         profile = get_profile()
         with st.form("personality_style"):
             c1, c2, c3 = st.columns(3)
