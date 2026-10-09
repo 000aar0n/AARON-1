@@ -116,3 +116,13 @@ python3 -m streamlit run app.py
 ```
 
 Refresh your existing browser tab; no new windows are required. Local training checkpoints and memories are preserved.
+
+## 🎭 Personality mirror (no LLM)
+
+Open the existing **💬 AARON-1** tab and expand **Teach AARON-1 your personality**. Tune the **Energy**, **Slang**, and **Humor** sliders; edit the optional words you use; then press **Save my vibe**. That changes AARON-1's stock replies while preserving its existing facts, chat log, and evolution results.
+
+To correct a response, fill in **When someone says…** and **AARON-1 should respond…**, then press **Teach this reply**. The first field defaults to your most recent chat message. Next time it sees the same or a *very similar* phrase, it retrieves your taught reply. You can forget any taught example from the same panel. All of these preferences and examples are stored in the local SQLite database in `data/`. Don't teach it private information you wouldn't want in that local database, and avoid deploying the editable personal profile to a public unauthenticated Streamlit instance.
+
+**Limitations:** This is direct teaching and rule-based tone adaptation, not neural language training, self-awareness, or a copy of a real person's personality. The style sliders mainly affect existing supported intents; unfamiliar questions still need explicit corrections. No LLM or paid API.
+
+Run checks with `python3 -m unittest test_personality.py`.
