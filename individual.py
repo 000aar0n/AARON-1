@@ -56,7 +56,9 @@ def history(limit=30):
 def respond(message):
     """Handle conversation using saved examples first, then bounded symbolic rules."""
     # Import inside this function to keep the DB helpers independent of style code.
-    from personality import learned_response, voice
+    from personality import ensure_brainrot_training, learned_response, voice
+
+    ensure_brainrot_training()
 
     raw = message.strip()
     msg = raw.lower().strip(" .!?")
