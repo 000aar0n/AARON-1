@@ -26,7 +26,7 @@ from training_ui import training_page
 from training_data import trained_model
 from trained_chat import inference_dependencies_ready
 
-APP_BUILD = "2026.10.10-calendar-v5"
+APP_BUILD = "2026.10.10-calendar-popup-v6"
 
 st.set_page_config(page_title="AARON-1", page_icon="🤖", layout="wide")
 
@@ -384,7 +384,7 @@ def main():
 
     install_theme()
     header()
-    st.caption("AARON-1 build " + APP_BUILD + " · Color-coded calendar, weekly events, and linked assignments")
+    st.caption("AARON-1 build " + APP_BUILD + " · Full-width class calendar and popup editor")
 
     # Google returns to this same local dashboard after the user approves OAuth.
     if "code" in st.query_params or "error" in st.query_params:
