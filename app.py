@@ -26,7 +26,7 @@ from training_ui import training_page
 from training_data import trained_model
 from trained_chat import inference_dependencies_ready
 
-APP_BUILD = "2026.10.10-calendar-popup-v6"
+APP_BUILD = "2026.10.10-calendar-chat-v7"
 
 st.set_page_config(page_title="AARON-1", page_icon="🤖", layout="wide")
 
@@ -337,17 +337,27 @@ def render_chat():
             available_local_models.clear()
             st.rerun()
 
-    previous = messages()
-    if not previous:
-        st.markdown(
-            "Ask me something, for example **what should I do next?**, "
-            "**what's due tomorrow?**, or "
-            "**add task finish chemistry due tomorrow at 5pm**."
-        )
-    for item in previous:
-        with st.chat_message(item["role"]):
-            st.markdown(item["message"])
-    prompt = st.chat_input("Talk to AARON-1…")
+    st.caption(
+        "📅 AARON-1 can read your imported classes, recurring events, and "
+        "attached assignments locally. Try **what's on my calendar this week?** "
+        "or **when is my next chemistry class?**"
+    )
+    previous = messages(limit=60)
+    # Fixed-height, independently scrolling conversation. The entry box stays
+    # OUTSIDE this container so long chats never push it off-screen.
+    with st.container(
+        height=550, border=True, key="aaron_chat_scroll_window"
+    ):
+        if not previous:
+            st.markdown(
+                "Ask me something, for example **what's on my calendar "
+                "this week?**, **what's due tomorrow?**, or "
+                "**add task finish chemistry due tomorrow at 5pm**."
+            )
+        for item in previous:
+            with st.chat_message(item["role"]):
+                st.markdown(item["message"])
+    prompt = st.chat_input("Talk to AARON-1…", key="aaron_chat_prompt")
     if prompt:
         history = messages(limit=12)
         write_chat("user", prompt)
@@ -384,7 +394,7 @@ def main():
 
     install_theme()
     header()
-    st.caption("AARON-1 build " + APP_BUILD + " · Full-width class calendar and popup editor")
+    st.caption("AARON-1 build " + APP_BUILD + " · Calendar popups, highlighted classes, and scrollable AI chat")
 
     # Google returns to this same local dashboard after the user approves OAuth.
     if "code" in st.query_params or "error" in st.query_params:
