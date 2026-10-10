@@ -322,9 +322,11 @@ def calendar_events(items):
                 "priority": level, "completed": is_done,
             },
         }
-        if hm and kind == "event":
-            finish = datetime.fromisoformat(start) + timedelta(
-                minutes=int(item.get("duration_min") or 60))
+        if hm:
+            # A task is a deadline marker, not a one-hour meeting block.
+            minutes = (int(item.get("duration_min") or 60)
+                       if kind == "event" else 15)
+            finish = datetime.fromisoformat(start) + timedelta(minutes=minutes)
             record["end"] = finish.isoformat(timespec="seconds")
         output.append(record)
     return output
