@@ -623,14 +623,14 @@ def calendar_page():
         "eventTimeFormat": {
             "hour": "numeric", "minute": "2-digit", "meridiem": "short"
         },
-        "slotMinTime": "00:00:00",
-        "slotMaxTime": "24:00:00",
+        "slotMinTime": "07:00:00",
+        "slotMaxTime": "23:00:00",
         "slotDuration": "00:30:00",
         "slotLabelInterval": "01:00:00",
         "slotLabelFormat": {
             "hour": "numeric", "minute": "2-digit", "meridiem": "short"
         },
-        "scrollTime": "07:00:00",
+        "scrollTime": "07:30:00",
         "moreLinkClick": "popover",
         "eventDisplay": "block",
         "eventOrder": "start,-duration,title",
@@ -647,7 +647,7 @@ def calendar_page():
         # New key intentionally resets persisted Week/Hour-Grid selection
         # from older versions so the readable view is actually displayed.
         # A fresh key resets the previous stacked-week selection on upgrade.
-        key="aaron_planner_aligned_week_v10",
+        key="aaron_planner_aligned_week_v11",
     )
     if isinstance(result, dict):
         callback = result.get("callback")
@@ -656,12 +656,22 @@ def calendar_page():
             event = clicked.get("event") or {}
             item_id = str(event.get("id") or "")
             parent_id = item_id.split("::", 1)[0]
-            signature = ("eventClick", item_id)
             if parent_id and get_item(parent_id):
-                if st.session_state.get("planner_last_click") != signature:
-                    st.session_state["planner_last_click"] = signature
+                # The calendar component reports single clicks but does not expose
+                # a native double-click event. Require two rapid clicks on the
+                # same item, without opening the editor on the first one.
+                now_click = datetime.now().timestamp()
+                previous = st.session_state.get("planner_pending_event_click")
+                if (previous and previous[0] == item_id
+                        and 0 <= now_click - previous[1] <= 1.5):
+                    st.session_state.pop("planner_pending_event_click", None)
                     _open_calendar_popup(item_id=item_id)
-                    st.rerun()  # Rerender to show the selected event outline.
+                    st.rerun()
+                else:
+                    st.session_state["planner_pending_event_click"] = (
+                        item_id, now_click
+                    )
+                    st.session_state["planner_highlight_id"] = item_id
         elif callback in ("dateClick", "select"):
             details = result.get(callback) or {}
             raw = details.get("date") or details.get("start")
@@ -683,8 +693,8 @@ def calendar_page():
     st.caption(
         "One weekly timetable: classes line up with the exact clock time on "
         "the left; all tasks are in the top TASKS row. Tasks with a due time "
-        "also appear as a DUE marker at that time. Click either copy to open "
-        "the same task. Linked assignments remain accessible from their class."
+        "also appear as a DUE marker at that time. Double-click an event or task to edit "
+        "it. Linked assignments remain accessible from their class."
     )
 
     # Keep the planner itself uncluttered; supporting panels sit BELOW it.
