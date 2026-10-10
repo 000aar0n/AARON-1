@@ -22,7 +22,9 @@ from planner import (
 CALENDAR_CSS = """
 .fc {--fc-border-color:#2a3142; --fc-page-bg-color:#10151e;
      --fc-neutral-bg-color:#171e2a; --fc-today-bg-color:#7361c11a;
-     color:#e5e8f1; font-family:Inter,system-ui,sans-serif}
+     color:#e5e8f1; font-family:Inter,system-ui,"PingFang SC",
+     "Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",
+     "Noto Sans SC","WenQuanYi Micro Hei",sans-serif}
 .fc .fc-toolbar {margin-bottom:20px}
 .fc .fc-toolbar-title {font-size:1.35rem;font-weight:740;letter-spacing:-.035em;color:#f5f6ff}
 .fc .fc-button-primary {background:#262e40;border-color:#404b63;
