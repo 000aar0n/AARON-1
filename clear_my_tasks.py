@@ -11,6 +11,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import sqlite3
 import sys
 
 from planner import manually_added_task_count, clear_manually_added_tasks
@@ -32,7 +33,7 @@ def main(argv=None):
         return 0
     try:
         deleted, backup = clear_manually_added_tasks(expected_count=count)
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, sqlite3.Error) as exc:
         print(f"Could not delete tasks: {exc}", file=sys.stderr)
         return 1
     print(f"Deleted {deleted} manually added task(s).")
