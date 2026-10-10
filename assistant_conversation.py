@@ -1,8 +1,8 @@
 """Conversational front door for AARON-1: safe task commands + optional local chat.
 
-The planner and memories belong to AARON-1. For genuinely free-form conversation
-the user can opt into a local Ollama model (no paid API, no remote endpoint).
-Without one, honest rule-based chat and useful task commands still work.
+The planner and memories belong to AARON-1. The pretrained Qwen model runs
+directly via PyTorch/Transformers; Ollama is entirely optional.
+Without inference dependencies, rule-based tasks and commands still work.
 """
 from __future__ import annotations
 
@@ -128,18 +128,20 @@ def _local_model_reply(message, previous, model):
         if item.get("role") in ("user", "assistant"):
             context.append({"role": item["role"], "content": str(item.get("message", ""))[:2200]})
     context.append({"role": "user", "content": message})
+    if model in ("__aaron_base__", "__aaron_trained__"):
+        try:
+            from trained_chat import generate, generate_base
+            return (generate(context) if model == "__aaron_trained__"
+                    else generate_base(context))
+        except (ImportError, OSError, RuntimeError, ValueError) as exc:
+            return ("I couldn't load my local conversational model. "
+                    "Your tasks and memories are safe. Check the Python "
+                    "training dependencies. The first use also downloads "
+                    f"Qwen weights (detail: {type(exc).__name__}: {exc}).")
     payload = json.dumps({
         "model": model, "messages": context,
         "stream": False, "options": {"temperature": .55, "num_predict": 420},
     }).encode("utf-8")
-    if model == "__aaron_trained__":
-        try:
-            from trained_chat import generate
-            return generate(context)
-        except (ImportError, OSError, RuntimeError, ValueError) as exc:
-            return ("I couldn't load my trained conversational model. "
-                    "Your tasks and memories are safe. Check Train AARON-1 "
-                    f"and the optional dependencies ({type(exc).__name__}: {exc}).")
     request = Request(OLLAMA_BASE + "/api/chat", data=payload,
                       headers={"Content-Type": "application/json"}, method="POST")
     try:
