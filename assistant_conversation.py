@@ -380,8 +380,20 @@ def _local_model_reply(message, previous, model):
     )
     context = [{"role": "system", "content": system}]
     for item in previous[-10:]:
-        if item.get("role") in ("user", "assistant"):
-            context.append({"role": item["role"], "content": str(item.get("message", ""))[:2200]})
+        role = item.get("role")
+        if role not in ("user", "assistant"):
+            continue
+        raw = str(item.get("message", ""))[:2200]
+        if role == "assistant" and re.search(
+            r"\b(?:calendar|timetable|schedule|classes|classroom|teachers?|"
+            r"course roster|school period|period \d|enrolled)\b",
+            raw, re.IGNORECASE,
+        ):
+            # Older generated replies may contain invented course names and
+            # teacher claims. They are NOT evidence and must never be fed
+            # back to the language model as apparent conversation facts.
+            continue
+        context.append({"role": role, "content": raw})
     context.append({"role": "user", "content": message})
     if model in ("__aaron_base__", "__aaron_trained__"):
         try:
