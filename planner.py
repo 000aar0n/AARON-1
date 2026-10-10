@@ -333,13 +333,19 @@ def toggle_complete(item_id, completed=True):
 
 
 def items_for_calendar(start=None, end=None, *, include_completed=True):
-    """Fetch full range, including legacy/imported tasks (not task-list limited)."""
+    """Return calendar records, including series overlapping the requested range.
+
+    Weekly series is stored once and expanded into displayed occurrences by
+    calendar_events(). Legacy/imported single-instance rows stay unchanged.
+    """
     ensure_schema()
     filters = ["due IS NOT NULL"]
     params = []
     if start:
-        filters.append("due >= ?")
-        params.append(normalize_date(start))
+        day = normalize_date(start)
+        filters.append("(due >= ? OR (item_type='event' AND repeat_weekly=1 "
+                       "AND repeat_until >= ?))")
+        params.extend((day, day))
     if end:
         filters.append("due < ?")
         params.append(normalize_date(end))
@@ -350,6 +356,51 @@ def items_for_calendar(start=None, end=None, *, include_completed=True):
     with connect() as db:
         rows = db.execute(sql, params).fetchall()
     return [dict(row) for row in rows]
+
+
+def linkable_events(limit=5000):
+    """Searchable dropdown choices, including imported appointments."""
+    ensure_schema()
+    with connect() as db:
+        rows = db.execute(
+            "SELECT id,title,due,due_time,repeat_weekly,repeat_until,color_name "
+            "FROM tasks WHERE item_type='event' ORDER BY due DESC, title LIMIT ?",
+            (max(1, min(int(limit), 10000)),),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def related_assignments(event_id):
+    """Tasks explicitly linked to an event or its entire weekly series."""
+    ensure_schema()
+    with connect() as db:
+        rows = db.execute(
+            "SELECT * FROM tasks WHERE item_type='task' AND linked_event_id=? "
+            "ORDER BY completed,due IS NULL,due,title",
+            (event_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def effective_color_name(item, event_colors=None):
+    picked = str(item.get("color_name") or "Auto")
+    if picked in EVENT_COLORS and picked != "Auto":
+        return picked
+    if (item.get("item_type") or "task") == "event":
+        if item.get("source") == "winter_arc":
+            return "Green"
+        if item.get("source") == "google_calendar":
+            return "Blue"
+        return "Teal"
+    linked = item.get("linked_event_id")
+    if linked:
+        parent = (event_colors or {}).get(linked)
+        if parent:
+            return parent
+        row = get_item(linked)
+        if row and row.get("item_type") == "event":
+            return effective_color_name(row)
+    return AUTO_PRIORITY_COLORS.get(int(item.get("priority_level") or 2), "Purple")
 
 
 def open_tasks(limit=1500):
@@ -368,10 +419,22 @@ def daily_items(day):
     day = normalize_date(day)
     with connect() as db:
         rows = db.execute(
-            "SELECT * FROM tasks WHERE due=? ORDER BY "
-            "COALESCE(due_time, '00:00'), completed, title", (day,)
+            "SELECT * FROM tasks WHERE due=? OR "
+            "(item_type='event' AND repeat_weekly=1 AND due<=? AND repeat_until>=?) "
+            "ORDER BY COALESCE(due_time, '00:00'), completed, title",
+            (day, day, day),
         ).fetchall()
-    return [dict(row) for row in rows]
+    answer = []
+    on_day = date.fromisoformat(day)
+    for row in rows:
+        task = dict(row)
+        if task.get("repeat_weekly") and task["due"] != day:
+            if date.fromisoformat(task["due"]).weekday() != on_day.weekday():
+                continue
+            task["due"] = day
+            task["occurrence_date"] = day
+        answer.append(task)
+    return answer
 
 
 def _due_datetime(item):
@@ -443,46 +506,85 @@ def next_actions(limit=6, now=None):
     return annotated[:max(1, min(int(limit), 50))]
 
 
-def calendar_events(items):
-    """Convert tasks and events into FullCalendar's event JSON."""
+def _occurrence_days(item, start=None, end=None):
+    """Iterate a single weekly series (at most 157 instances), bounded by dates."""
+    first = date.fromisoformat(item["due"])
+    if not item.get("repeat_weekly") or item.get("item_type") != "event":
+        if (start is None or first >= normalize_as_date(start)) and (
+            end is None or first < normalize_as_date(end)
+        ):
+            yield first
+        return
+    last = date.fromisoformat(item["repeat_until"])
+    if start is not None:
+        first_visible = normalize_as_date(start)
+        if first_visible > first:
+            first += timedelta(days=7 * ((first_visible-first).days + 6)//7)
+    if end is not None:
+        last = min(last, normalize_as_date(end) - timedelta(days=1))
+    # A three-year max series bound is enforced by validate_fields().
+    for count in range(158):
+        day = first + timedelta(days=7 * count)
+        if day > last:
+            break
+        yield day
+
+
+def normalize_as_date(value):
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    return date.fromisoformat(normalize_date(value))
+
+
+def calendar_events(items, *, start=None, end=None):
+    """Materialize weekly occurrences while keeping one editable parent event."""
+    items = list(items)
     output = []
-    colors = {
-        1: ("#526178", "#f0f3fa"),
-        2: ("#747acf", "#ffffff"),
-        3: ("#edaa69", "#17151b"),
-        4: ("#f07182", "#1b1118"),
+    event_colors = {
+        item["id"]: effective_color_name(item)
+        for item in items if item.get("item_type") == "event"
     }
     for item in items:
-        day = item.get("due")
-        if not day:
+        if not item.get("due"):
             continue
         kind = item.get("item_type") or "task"
         is_done = bool(item.get("completed"))
-        level = int(item.get("priority_level") or 2)
-        bg, fg = colors.get(level, colors[2])
-        if kind == "event":
-            bg, fg = "#3a9c91", "#ffffff"
+        color_name = effective_color_name(item, event_colors)
+        bg = EVENT_COLORS[color_name]
+        fg = "#FFFFFF"
         if is_done:
-            bg, fg = "#303c49", "#b4c1d1"
+            bg, fg = "#303C49", "#D2DBE6"
         hm = item.get("due_time")
-        start = f"{day}T{hm}:00" if hm else day
-        record = {
-            "id": item["id"], "title": ("✓ " if is_done else "") + item["title"],
-            "start": start, "allDay": not bool(hm),
-            "backgroundColor": bg, "borderColor": bg, "textColor": fg,
-            "extendedProps": {
-                "kind": kind, "description": item.get("notes", ""),
-                "priority": level, "completed": is_done,
-            },
-        }
-        if item.get("event_end") and kind == "event":
-            # Google Calendar uses exact end times; all-day end dates are exclusive.
-            record["end"] = item["event_end"]
-        elif hm:
-            # A task is a deadline marker, not a one-hour meeting block.
-            minutes = (int(item.get("duration_min") or 60)
-                       if kind == "event" else 15)
-            finish = datetime.fromisoformat(start) + timedelta(minutes=minutes)
-            record["end"] = finish.isoformat(timespec="seconds")
-        output.append(record)
+        for occurrence in _occurrence_days(item, start=start, end=end):
+            day = occurrence.isoformat()
+            calendar_id = (
+                item["id"] + "::" + day if item.get("repeat_weekly") else item["id"]
+            )
+            title_prefix = "✓ " if is_done else "↻ " if item.get("repeat_weekly") else ""
+            start_at = f"{day}T{hm}:00" if hm else day
+            record = {
+                "id": calendar_id, "title": title_prefix + item["title"],
+                "start": start_at, "allDay": not bool(hm),
+                "backgroundColor": bg, "borderColor": bg,
+                "textColor": fg,
+                "extendedProps": {
+                    "kind": kind, "description": item.get("notes", ""),
+                    "priority": int(item.get("priority_level") or 2),
+                    "completed": is_done, "color": color_name,
+                    "linkedEventId": item.get("linked_event_id"),
+                    "seriesId": item["id"],
+                    "occurrenceDate": day,
+                },
+            }
+            if item.get("event_end") and kind == "event" and not item.get("repeat_weekly"):
+                record["end"] = item["event_end"]
+            elif hm:
+                minutes = (int(item.get("duration_min") or 60)
+                           if kind == "event" else 15)
+                record["end"] = (
+                    datetime.fromisoformat(start_at) + timedelta(minutes=minutes)
+                ).isoformat(timespec="seconds")
+            output.append(record)
     return output
