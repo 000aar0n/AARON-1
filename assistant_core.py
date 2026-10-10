@@ -34,7 +34,7 @@ def _configuration_value(name):
     try:
         import streamlit as st
         return str(st.secrets.get(name, "") or "").strip()
-    except (FileNotFoundError, KeyError, OSError):
+    except (ImportError, FileNotFoundError, KeyError, OSError):
         return ""
 
 
