@@ -88,6 +88,48 @@ def delete_example(example_id):
         return bool(result.rowcount)
 
 
+
+def export_jsonl():
+    """Copy only approved examples; useful for transfer to a separate training PC."""
+    return "".join(json.dumps(
+        {"prompt": row["prompt"], "response": row["response"]},
+        ensure_ascii=False
+    ) + "\n" for row in examples())
+
+
+def import_jsonl(raw):
+    """Import explicit approved pairs, not an arbitrary chat/email archive."""
+    if isinstance(raw, bytes):
+        if len(raw) > 2_000_000:
+            raise ValueError("Training-example file exceeds 2 MB")
+        raw = raw.decode("utf-8-sig")
+    else:
+        raw = str(raw)
+        if len(raw.encode("utf-8")) > 2_000_000:
+            raise ValueError("Training-example file exceeds 2 MB")
+    validated = []
+    for line in raw.splitlines():
+        if not line.strip():
+            continue
+        if len(validated) >= MAX_EXAMPLES:
+            raise ValueError("Training example file contains too many rows")
+        try:
+            pair = json.loads(line)
+            validated.append(_validate(pair["prompt"], pair["response"]))
+        except (ValueError, TypeError, KeyError) as exc:
+            raise ValueError("Expected JSONL lines with prompt and response") from exc
+    if not validated:
+        raise ValueError("There are no prompt/response pairs in that file")
+    existing = {(x["prompt"], x["response"]) for x in examples()}
+    added = 0
+    for prompt, response in validated:
+        if (prompt, response) not in existing:
+            add_example(prompt, response, source="manual")
+            existing.add((prompt, response))
+            added += 1
+    return added
+
+
 def training_split(rows):
     """Deterministic, nonoverlapping train/eval split; never silently train on 1 pair."""
     if len(rows) < MIN_EXAMPLES:
