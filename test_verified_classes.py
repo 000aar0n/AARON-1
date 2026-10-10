@@ -244,14 +244,14 @@ class GroundedCalendarTests(unittest.TestCase):
         self.assertIn("can't find", output.lower())
         self.assertNotIn("10:05", output)
 
-    def test_full_title_mode_remains_stacked_and_scrollable(self):
-        from planner_ui import CALENDAR_CSS, _readable_week_agenda
+    def test_one_clock_aligned_week_replaces_second_scrollable_week(self):
         from inspect import getsource
-        src = getsource(planner_ui.calendar_page)
-        self.assertIn('"initialView": "dayGridWeek"', src)
-        self.assertIn("height=390", getsource(_readable_week_agenda))
-        self.assertIn("planner_read_full_", getsource(_readable_week_agenda))
-        self.assertIn("font-size:14px", CALENDAR_CSS)
+        source = getsource(planner_ui.calendar_page)
+        self.assertIn('"initialView": "timeGridWeek"', source)
+        self.assertIn('"allDayText": "TASKS"', source)
+        self.assertNotIn("_readable_week_agenda(", source)
+        self.assertNotIn("dayGridWeek", source)
+        self.assertIn("aaron_planner_aligned_week_v10", source)
 
 
 if __name__ == "__main__":
