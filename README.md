@@ -28,16 +28,18 @@ examples are read from and written to the durable remote database instead.
    `turso db show --url aaron1` and
    `turso db tokens create aaron1`. These give your remote URL and private token.
 3. In [Streamlit Community Cloud](https://share.streamlit.io), open your app's
-   **Settings → Secrets**. Add the three secrets below (actual values go in
+   **Settings → Secrets**. Add these two secrets (actual values go in
    Streamlit Secrets, **not** in GitHub files):
 
    ```toml
    TURSO_DATABASE_URL = "https://your-database-url"
    TURSO_AUTH_TOKEN = "your-private-database-token"
-   APP_PASSWORD = "a-long-random-password-unique-to-this-app"
    ```
 
-4. Reboot your Streamlit app, unlock AARON-1, then open
+   There is no in-app password screen. Set your **Streamlit app visibility to
+   Private** before adding personal calendar data. If the app is public, anyone
+   able to open the website could view or modify your events and conversations.
+4. Reboot your Streamlit app, then open
    **Settings → Data protection**. Confirm **Persistent database configured**.
    Use **Restore a saved backup** to import your previously downloaded JSON.
    Restoration is merge-only: existing records are not deleted or overwritten.
@@ -45,12 +47,14 @@ examples are read from and written to the durable remote database instead.
    Future sleep/reboots won't wipe data stored in the Turso database, though
    the site can still sleep.
 
-**Safety:** AARON-1 refuses to run with only one of the two Turso credentials,
-and refuses to reveal a remote-backed personal calendar if APP_PASSWORD is
-missing. If the database is unreachable it raises an error instead of silently
-saving to throwaway local SQLite. AARON-1's export does not include Gmail OAuth
-files, downloaded model weights or local training jobs; those require separate
-storage and backups. If using Streamlit Cloud, keep the app private as well.
+**Safety:** AARON-1 refuses to run with only one of the two Turso credentials.
+If the database is unreachable it raises an error instead of silently
+saving to throwaway local SQLite. **There is no in-app authentication**:
+use Streamlit Cloud's private app visibility or another authenticated hosting
+layer to restrict access to your school calendar, tasks, and messages.
+The Turso token protects the database connection, **not the public website**.
+AARON-1's export does not include Gmail OAuth files, downloaded model weights
+or local training jobs; those require separate storage and backups.
 
 ### Unicode and special characters
 
