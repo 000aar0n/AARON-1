@@ -1,0 +1,7 @@
+# Optional for REAL LoRA adapter fine-tuning and local inference.
+# First install the correct PyTorch build for your OS/GPU from pytorch.org or AMD.
+# On AMD RX 9060 XT, use AMD's ROCm-compatible PyTorch instructions.
+torch>=2.6,<3
+transformers>=4.51,<5
+peft>=0.15,<1
+accelerate>=1.6,<2
