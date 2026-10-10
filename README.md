@@ -1,11 +1,12 @@
 # 🤖 AARON-1 — your personal assistant
 
-**One assistant. Three tabs. No agent network, no LLM, no API fees.**
+**One assistant. Four tabs. No agent network, no LLM, no API fees.**
 
 This version has replaced the sender/receiver, evolution, and sandbox-network experiments. Old experiment source files were removed. Files and checkpoints already saved on your computer under `data/` were **not deleted**; previously taught personal facts are migrated into the new task database.
 
 ## What can it actually do?
 
+- **📅 Calendar:** a monthly view of due dates with clickable days, a focused side panel, quick task creation, completed tasks, and scheduling previously undated tasks.
 - **💬 Chat:** simple commands like `what homework is due`, `add task read chapter 3`, `check my email`, or `my favorite subject is chemistry`.
 - **✅ Tasks:** manually add, prioritize, complete, and reopen assignments. The **Important** / **Not urgent** buttons train a small personal priority model.
 - **🔗 Connect:** import school assignments from an .ics calendar export or .csv file. Optionally authorize a personal **Gmail** account using Google's own OAuth sign-in, with **read-only** Gmail access. Browse inbox subjects and snippets, search school-related email, and explicitly add a message as a task.
@@ -24,7 +25,7 @@ python3 -m pip install -r requirements.txt
 python3 -m streamlit run app.py
 ```
 
-Refresh your existing browser tab at http://localhost:8501. You no longer need to start `trainer.py`, `evolution.py`, or any other background training process. Use Ctrl+C in the existing Streamlit Terminal to stop before rerunning.
+Refresh your existing browser tab at http://localhost:8501. The interface uses a dark, minimalist style and shows **Calendar**, **Assignments**, **Chat**, and **Connections** tabs. You no longer need to start `trainer.py`, `evolution.py`, or any other background training process. Use Ctrl+C in the existing Streamlit Terminal to stop before rerunning.
 
 First-time install:
 
@@ -74,3 +75,7 @@ python3 -m unittest -v test_assistant.py
 ```
 
 GitHub Actions checks syntax and runs these tests on pushes. OAuth live authorization has to be tested on your Mac, with your permission.
+
+## UI design
+
+The dashboard uses an integrated dark visual system in `ui_theme.py` and `.streamlit/config.toml`: charcoal backgrounds, restrained violet and mint accents, compact calendar cards, a selected-day details panel, and larger readable task rows. The style change does not reset any local tasks or authentication state. The calendar and the assignment list use the same SQLite task database.
