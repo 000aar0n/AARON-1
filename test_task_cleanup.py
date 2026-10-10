@@ -162,13 +162,19 @@ class TaskCleanupTests(unittest.TestCase):
         self.assertIsNone(planner.get_item(first))
         self.assertEqual(planner.manually_added_task_count(), 2)
 
-        at.checkbox(key="priorities_confirm_bulk_delete").set_value(True).run()
+        at.checkbox(key="priorities_confirm_bulk_delete_0").set_value(True).run()
         self.assertEqual(len(at.exception), 0)
         at.button(key="priorities_bulk_delete").click().run()
         self.assertEqual(len(at.exception), 0)
         self.assertEqual(planner.manually_added_task_count(), 0)
         for task in (imported, email, event):
             self.assertIsNotNone(planner.get_item(task))
+        self.assertIn(
+            "priorities_confirm_bulk_delete_1",
+            [box.key for box in at.checkbox],
+            "The bulk delete confirmation must reset after a successful clear",
+        )
+        self.assertFalse(at.checkbox(key="priorities_confirm_bulk_delete_1").value)
 
 
 if __name__ == "__main__":
