@@ -13,10 +13,8 @@ from winter_arc import upcoming_workout
 from planner import (
     EVENT_COLORS, PRIORITY_NAMES, all_tasks, calendar_events,
     clear_manually_added_tasks, create_item, daily_items, delete_item,
-    effective_color_name, get_item, imported_review_counts,
-    is_verified_personal, items_for_calendar, linkable_events,
+    effective_color_name, get_item, items_for_calendar, linkable_events,
     manually_added_task_count, next_actions, open_tasks, related_assignments,
-    review_imported_groups, set_imported_personal_status,
     toggle_complete, update_item, set_priority,
 )
 
@@ -341,39 +339,6 @@ def _render_editor(*, scope):
             st.error(str(exc))
 
     if existing:
-        if existing.get("source") == "google_calendar":
-            status = existing.get("personal_status") or "unverified"
-            if status == "mine":
-                st.success("✓ You confirmed this is on your personal schedule.")
-            elif status == "not_mine":
-                st.warning("Not mine — excluded from your personal schedule.")
-            else:
-                st.warning(
-                    "⚠ Unverified school-calendar event. Being in the "
-                    "imported file does NOT mean you're enrolled."
-                )
-            mark_mine, mark_other = st.columns(2)
-            if mark_mine.button(
-                "✓ This is my class/event",
-                key=f"{prefix}_confirm_mine", use_container_width=True,
-            ):
-                changed = set_imported_personal_status(existing["id"], "mine")
-                st.toast(f"Confirmed {changed} matching calendar occurrence(s)")
-                if scope == "calendar":
-                    _dismiss_calendar_popup()
-                st.rerun()
-            if mark_other.button(
-                "✕ Not my class",
-                key=f"{prefix}_confirm_not_mine",
-                use_container_width=True,
-            ):
-                changed = set_imported_personal_status(
-                    existing["id"], "not_mine"
-                )
-                st.toast(f"Excluded {changed} unrelated calendar occurrence(s)")
-                if scope == "calendar":
-                    _dismiss_calendar_popup()
-                st.rerun()
         if (existing.get("item_type") or "task") == "task" and existing.get("linked_event_id"):
             parent = get_item(existing["linked_event_id"])
             if parent:
@@ -490,81 +455,6 @@ def _calendar_editor_dialog():
         st.rerun()
 
 
-def _review_school_calendar():
-    """Verify which imported class sections are actually the user's.
-
-    Imports may be school-wide. Only confirmed records become part of the
-    user's calendar and assistant context. The original import is retained.
-    """
-    counts = imported_review_counts()
-    total = sum(counts.values())
-    if total == 0:
-        return
-    with st.expander(
-        f"📚 Review imported classes · {counts['unverified']} unverified entries",
-        expanded=False,
-    ):
-        st.warning(
-            "School timetable imports can include classes you **do not take**. "
-            "AARON-1 will NOT call these your classes until you confirm them. "
-            "Choose only classes/events that actually belong to you."
-        )
-        st.caption(
-            f"{counts['mine']} confirmed entries · "
-            f"{counts['not_mine']} excluded · "
-            f"{counts['unverified']} awaiting review. "
-            "Matching repeated occurrences are confirmed together."
-        )
-        search = st.text_input(
-            "Search class title, teacher or location",
-            key="planner_verify_class_search",
-            placeholder="e.g. Chemistry, 3610, teacher name",
-        )
-        status_filter = st.selectbox(
-            "Show", ["Unverified", "Confirmed mine", "Not mine", "All"],
-            key="planner_verify_status_filter",
-        )
-        lookups = {
-            "Unverified": "unverified", "Confirmed mine": "mine",
-            "Not mine": "not_mine",
-        }
-        status = lookups.get(status_filter)
-        # Search across the full local import, then group by recurrence UID.
-        groups = review_imported_groups(search=search, limit=1000)
-        groups = [
-            item for item in groups
-            if status is None or item["status"] == status
-        ][:75]
-        if not groups:
-            st.info("No matching imported classes. Try a different search.")
-        for group in groups:
-            with st.container(border=True):
-                st.markdown("**" + html.escape(group["title"]) + "**")
-                metadata = (
-                    (group.get("first_date") or "") + " " +
-                    (group.get("time") or "all day") +
-                    f" · {group['occurrences']} matching occurrence(s)"
-                )
-                st.caption(metadata)
-                if group.get("notes"):
-                    st.caption(str(group["notes"])[:180])
-                accept, reject = st.columns(2)
-                if accept.button(
-                    "✓ Mine", key="review_mine_" + group["id"],
-                    use_container_width=True,
-                ):
-                    set_imported_personal_status(group["id"], "mine")
-                    st.rerun()
-                if reject.button(
-                    "✕ Not mine", key="review_exclude_" + group["id"],
-                    use_container_width=True,
-                ):
-                    set_imported_personal_status(group["id"], "not_mine")
-                    st.rerun()
-        if len(groups) == 75:
-            st.caption("Showing 75 groups. Search to narrow the results.")
-
-
 def _readable_week_agenda():
     """A true full-title fallback, independent of FullCalendar's iframe sizing.
 
@@ -590,12 +480,7 @@ def _readable_week_agenda():
     ):
         for offset in range(7):
             day = start + timedelta(days=offset)
-            items = [
-                item for item in daily_items(day)
-                if is_verified_personal(item)
-                or st.session_state.get("planner_show_unverified_imports", False)
-                   and item.get("personal_status") != "not_mine"
-            ]
+            items = daily_items(day)
             if not items:
                 continue
             any_events = True
@@ -618,11 +503,7 @@ def _readable_week_agenda():
                     )
                 with c_name:
                     display_title = str(item["title"])
-                    if item.get("source") == "google_calendar" and (
-                        item.get("personal_status") != "mine"
-                    ):
-                        display_title = "⚠ UNVERIFIED · " + display_title
-                    elif item.get("completed"):
+                    if item.get("completed"):
                         display_title = "✓ " + display_title
                     if item.get("repeat_weekly"):
                         display_title = "↻ " + display_title
@@ -678,20 +559,6 @@ def calendar_page():
         for label, color in keys
     )
     st.markdown(legend, unsafe_allow_html=True)
-    counts = imported_review_counts()
-    if counts["unverified"]:
-        st.warning(
-            f"**{counts['unverified']} imported calendar entries aren't "
-            "verified as yours.** School exports may include other students' "
-            "classes. They are hidden from your personal calendar and AARON-1's "
-            "answers until you confirm them below."
-        )
-    show_unverified = st.toggle(
-        "Show unverified imported events on calendar (for review only)",
-        value=False, key="planner_show_unverified_imports",
-    )
-    _review_school_calendar()
-
     new_task, new_event, hint = st.columns([1.1, 1.1, 4], gap="small")
     if new_task.button(
         "+ New task", use_container_width=True, type="primary",
@@ -712,14 +579,7 @@ def calendar_page():
     range_start = today - timedelta(days=365)
     range_end = today + timedelta(days=730)
     all_events = calendar_events(
-        [
-            item for item in items_for_calendar(
-                start=range_start, end=range_end,
-            )
-            if is_verified_personal(item)
-            or (show_unverified and item.get("source") == "google_calendar"
-                and item.get("personal_status") != "not_mine")
-        ],
+        items_for_calendar(start=range_start, end=range_end),
         start=range_start, end=range_end,
     )
     selected_event_id = st.session_state.get("planner_highlight_id")
