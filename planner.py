@@ -151,6 +151,25 @@ def delete_item(item_id):
     return bool(result.rowcount)
 
 
+
+def set_priority(item_id, level):
+    """Explicit user feedback changes both priority and local learned preference."""
+    level = int(level)
+    if level not in PRIORITY_NAMES:
+        raise ValueError("Priority must be 1–4")
+    ensure_schema()
+    with connect() as db:
+        row = db.execute(
+            "SELECT item_type FROM tasks WHERE id=?", (item_id,)
+        ).fetchone()
+        if row is None or row["item_type"] != "task":
+            return False
+        db.execute("UPDATE tasks SET priority_level=? WHERE id=?", (level, item_id))
+        db.commit()
+    learn_priority(item_id, level >= 3)
+    return True
+
+
 def toggle_complete(item_id, completed=True):
     ensure_schema()
     with connect() as db:
