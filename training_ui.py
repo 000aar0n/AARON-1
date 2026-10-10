@@ -63,10 +63,18 @@ def _recent_pairs(history):
 
 def training_page(history):
     page_heading(
-        "Personalize the language model", "Train AARON-1",
-        "Teach it your preferred replies, fine-tune a small pretrained model, "
-        "and activate the improved version for conversations.",
+        "MODEL LAB", "Train AARON-1",
+        "Review approved examples, fine-tune a conversational model, and "
+        "choose which version to use in Chat.",
     )
+    hosted = bool(os.environ.get("RENDER"))
+    if hosted:
+        st.warning(
+            "This Render instance cannot run the local model-training workload. "
+            "You can review and export examples here, but train the model on "
+            "your own computer. Render's temporary storage can also reset "
+            "examples during deployment."
+        )
     approved = examples()
     recent = recent_jobs(12)
     active = trained_model()
@@ -101,7 +109,7 @@ def training_page(history):
     example_col, run_col = st.columns([1.2, 1], gap="large")
     with example_col:
         with st.container(border=True, key="examples_manual_card"):
-            st.markdown("### 1 · Teach an example")
+            st.markdown("### Training examples")
             st.caption(
                 "Write a message and the answer you WANT AARON-1 to give. "
                 "Only clicking Save approves this example for training."
@@ -192,10 +200,10 @@ def training_page(history):
 
     with run_col:
         with st.container(border=True, key="training_job_card"):
-            st.markdown("### 2 · Fine-tune the model")
+            st.markdown("### Fine-tune")
             st.caption(
                 "Real LoRA gradient training on a small open-weight Qwen model. "
-                "It will use your computer and download base weights if needed."
+                "Runs on the hosting machine and downloads base weights if needed."
             )
             if not training_packages_available():
                 st.warning(
@@ -237,10 +245,10 @@ def training_page(history):
             busy = any(j.get("status") in ("queued", "running") for j in recent[:10])
             disabled = (
                 len(approved) < MIN_EXAMPLES or busy or
-                not training_packages_available()
+                not training_packages_available() or hosted
             )
             if st.button(
-                "🧠 Train AARON-1 on this computer",
+                "Start fine-tuning",
                 type="primary", use_container_width=True,
                 disabled=disabled, key="start_finetune",
             ):
@@ -258,7 +266,7 @@ def training_page(history):
             if busy:
                 st.info("A training job is in progress. "
                         "Only one training job can run at a time.")
-            st.markdown("### 3 · Review and activate")
+            st.markdown("### Training history")
             if st.button("Refresh training status", key="refresh_training",
                          use_container_width=True):
                 st.rerun()
