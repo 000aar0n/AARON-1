@@ -221,6 +221,14 @@ def training_page(history):
             )
             epochs = st.slider("Training passes (epochs)", min_value=1,
                                max_value=5, value=3)
+            continue_training = st.checkbox(
+                "Continue training my current AARON-1 adapter",
+                value=bool(active),
+                disabled=not bool(active),
+                help="If the selected base model matches the active model, "
+                     "the previous trained weights are reused. Otherwise "
+                     "a new LoRA adapter starts from the pretrained base.",
+            )
             st.caption(
                 "Minimum eight approved examples; 30–100+ varied corrections "
                 "usually give a more meaningful signal. A few examples can "
@@ -237,7 +245,10 @@ def training_page(history):
                 disabled=disabled, key="start_finetune",
             ):
                 try:
-                    job = create_job(model=model, epochs=epochs)
+                    job = create_job(
+                        model=model, epochs=epochs,
+                        continue_from_active=continue_training
+                    )
                     launch_job(job)
                     st.success("Training started on this computer. "
                                "Refresh its status below.")
@@ -264,6 +275,9 @@ def training_page(history):
                         f"{job['train_count']} training / {job['eval_count']} "
                         f"validation examples · {job['epochs']} epochs"
                     )
+                    if job.get("parent_job_id"):
+                        st.caption("Continued from previous trained version "
+                                   + job["parent_job_id"][:12])
                     if job.get("device"):
                         st.caption("Hardware: " + str(job["device"]))
                     if job.get("metrics"):
