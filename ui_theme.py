@@ -260,6 +260,7 @@ hr {border-color:var(--a-border)!important;}
 }
 .cal-event.school{background:#80d5c214;color:#a5e8d8;border-color:#80d5c2;}
 .cal-more{color:#a6afc1;font-size:10px;font-weight:650;padding:1px 5px;}
+.cal-count{display:none;color:#bcb6ff;font-size:10px;padding:1px 5px;font-weight:750;}
 .cal-finished{color:#7fcdb7;font-size:10px;font-weight:650;padding:5px 4px;}
 .cal-quiet{color:#536074;font-size:11px;padding:5px 4px;}
 .cal-today-flag{
@@ -303,6 +304,7 @@ hr {border-color:var(--a-border)!important;}
  .metricbox{padding:12px;min-height:85px;}
  .metric-value{font-size:23px;}
  .cal-event{display:none;}
+ .cal-count{display:block;}
  .cal-more,.cal-quiet,.cal-finished{font-size:9px;}
  [class*="st-key-cal-cell-"]{min-height:72px!important;padding:4px!important;}
  [class*="st-key-cal-cell-"] [data-testid="stButton"] button{font-size:12px!important;padding:0 5px!important;}
