@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -86,7 +87,7 @@ class TaskCleanupTests(unittest.TestCase):
             task["title"] for task in planner.all_tasks()
         ])
         # Full database backup existed BEFORE deletion and can be restored.
-        with sqlite3.connect(backup) as db:
+        with closing(sqlite3.connect(backup)) as db:
             remaining = db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
         self.assertEqual(remaining, 6)
 
