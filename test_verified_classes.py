@@ -190,6 +190,42 @@ class VerifiedCalendarTests(unittest.TestCase):
         for item_id in ids:
             self.assertIsNotNone(planner.get_item(item_id))
 
+    def test_reimport_preserves_confirmation_for_new_recurrence(self):
+        from google_calendar_import import import_google_calendar
+
+        def calendar_export(count):
+            lines = [
+                "BEGIN:VCALENDAR", "VERSION:2.0",
+                "BEGIN:VEVENT", "UID:verified-class@example.edu",
+                "DTSTART;TZID=America/New_York:20261012T100000",
+                "DTEND;TZID=America/New_York:20261012T110000",
+                f"RRULE:FREQ=WEEKLY;COUNT={count}",
+                "SUMMARY:My actual Physics Class", "END:VEVENT",
+                "END:VCALENDAR", "",
+            ]
+            return "\r\n".join(lines).encode("utf-8")
+
+        import_google_calendar(
+            calendar_export(2), "school.ics",
+            from_date=date(2026, 10, 1), months=2,
+        )
+        first_import = [
+            r for r in planner.items_for_calendar()
+            if r.get("source") == "google_calendar"
+        ]
+        self.assertEqual(len(first_import), 2)
+        planner.set_imported_personal_status(first_import[0]["id"], "mine")
+        import_google_calendar(
+            calendar_export(3), "school.ics",
+            from_date=date(2026, 10, 1), months=2,
+        )
+        rows = [
+            r for r in planner.items_for_calendar()
+            if r.get("source") == "google_calendar"
+        ]
+        self.assertEqual(len(rows), 3)
+        self.assertTrue(all(r["personal_status"] == "mine" for r in rows))
+
     def test_full_title_mode_is_stacked_week_and_scrollable(self):
         from planner_ui import CALENDAR_CSS, _readable_week_agenda
         from inspect import getsource
