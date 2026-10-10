@@ -221,7 +221,11 @@ def render_calendar():
     for task in month_tasks:
         by_day[task["due"]].append(task)
     remaining = [task for task in month_tasks if not task["completed"]]
-    today_count = len([task for task in remaining if task["due"] == today.isoformat()])
+    today_tasks = tasks_due_in_month(today.year, today.month)
+    today_count = sum(
+        task["due"] == today.isoformat() and not task["completed"]
+        for task in today_tasks
+    )
     completed_count = len(month_tasks) - len(remaining)
 
     a, b, c = st.columns(3, gap="medium")
