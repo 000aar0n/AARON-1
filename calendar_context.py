@@ -90,8 +90,16 @@ def format_schedule(entries, label, *, max_events=35):
         lines.append(f"• {when} — **{name}** ({annotation})")
     if len(entries) > max_events:
         lines.append(
-            f"…plus {len(entries) - max_events} more items. "
-            "Use Planner → Agenda to see the rest."
+            f"…plus {len(entries) - max_events} more confirmed items. "
+            "Use Planner → Readable Week to see the rest."
+        )
+    pending = imported_review_counts().get("unverified", 0)
+    if pending:
+        lines.append(
+            f"\n⚠ {pending} imported school-calendar entries are **unverified** "
+            "and have been excluded. They may belong to other students. "
+            "Review your classes in Planner before treating this as a "
+            "complete personal timetable."
         )
     return "\n".join(lines)
 
