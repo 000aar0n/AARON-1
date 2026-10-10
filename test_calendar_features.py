@@ -158,6 +158,62 @@ class CalendarFeatureTests(unittest.TestCase):
             self.assertIsNotNone(planner.get_item(assignment))
             self.assertIsNone(planner.get_item(assignment)["linked_event_id"])
 
+    def test_google_cancellation_preserves_linked_homework(self):
+        from google_calendar_import import import_google_calendar
+        head = "BEGIN:VCALENDAR\\r\\nVERSION:2.0\\r\\n"
+        master = (
+            "BEGIN:VEVENT\\r\\nUID:chem-class@calendar\\r\\n"
+            "DTSTART;TZID=America/New_York:20261012T140000\\r\\n"
+            "DTEND;TZID=America/New_York:20261012T150000\\r\\n"
+            "RRULE:FREQ=WEEKLY;COUNT=2\\r\\n"
+            "SUMMARY:Chemistry\\r\\nEND:VEVENT\\r\\n"
+        )
+        cancelled = (
+            "BEGIN:VEVENT\\r\\nUID:chem-class@calendar\\r\\n"
+            "RECURRENCE-ID;TZID=America/New_York:20261012T140000\\r\\n"
+            "DTSTART;TZID=America/New_York:20261012T140000\\r\\n"
+            "DTEND;TZID=America/New_York:20261012T150000\\r\\n"
+            "STATUS:CANCELLED\\r\\n"
+            "SUMMARY:Chemistry\\r\\nEND:VEVENT\\r\\n"
+        )
+        initial = (head + master + "END:VCALENDAR\\r\\n").encode()
+        import_google_calendar(
+            initial, "mycalendar.ics", from_date=date(2026, 10, 1), months=2,
+        )
+        parent = next(
+            item for item in planner.items_for_calendar()
+            if item["due"] == "2026-10-12"
+        )
+        homework = planner.create_item(
+            title="Practice equations", due="2026-10-14",
+            linked_event_id=parent["id"],
+        )
+        altered = (head + master + cancelled + "END:VCALENDAR\\r\\n").encode()
+        result = import_google_calendar(
+            altered, "mycalendar.ics", from_date=date(2026, 10, 1), months=2,
+        )
+        self.assertEqual(result["cancelled_removed"], 1)
+        self.assertIsNone(planner.get_item(parent["id"]))
+        self.assertIsNotNone(planner.get_item(homework))
+        self.assertIsNone(planner.get_item(homework)["linked_event_id"])
+
+    def test_create_assignment_from_event_keeps_preselected_parent(self):
+        from planner_ui import _render_editor
+        parent = self.create_weekly()
+        script = (
+            "import streamlit as st\\n"
+            "from planner_ui import _render_editor\\n"
+            f"st.session_state.setdefault('planner_editor_id', {parent!r})\\n"
+            "_render_editor(scope='calendar')\\n"
+        )
+        app = AppTest.from_string(script, default_timeout=30).run()
+        self.assertEqual(len(app.exception), 0, repr([e.message for e in app.exception]))
+        app.button(key="calendar_planner_0_create_attached").click().run()
+        self.assertEqual(len(app.exception), 0, repr([e.message for e in app.exception]))
+        self.assertEqual(
+            app.selectbox(key="calendar_planner_1_linked_event").value, parent,
+        )
+
     def test_full_app_has_color_weekly_and_assignment_controls(self):
         from app import APP_BUILD
         self.assertIn("calendar-v5", APP_BUILD)
