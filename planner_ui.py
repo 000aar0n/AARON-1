@@ -95,12 +95,12 @@ def _new_item(day=None, at_time=None, kind="task"):
     st.session_state["planner_new_kind"] = kind
 
 
-def _render_editor():
+def _render_editor(*, scope):
     """One editor for tasks/events; retained data is the same across pages."""
     existing = get_item(st.session_state.get("planner_editor_id")) if (
         st.session_state.get("planner_editor_id")) else None
     nonce = st.session_state.get("planner_editor_nonce", 0)
-    prefix = f"planner_{nonce}"
+    prefix = f"{scope}_planner_{nonce}"
     name = "Edit entry" if existing else "Create an entry"
     st.markdown("#### " + name)
 
@@ -225,13 +225,13 @@ def _render_editor():
                 st.rerun()
 
 
-def _action_list(limit=5):
+def _action_list(limit=5, *, scope):
     actions = next_actions(limit=limit)
     if not actions:
         st.success("You're clear! No outstanding tasks.")
         return
     for rank, task in enumerate(actions, 1):
-        with st.container(border=True, key=f"recommended_{task['id']}"):
+        with st.container(border=True, key=f"{scope}_recommended_{task['id']}"):
             head, grade = st.columns([5, 1])
             head.markdown("**" + html.escape(task["title"]) + "**")
             grade.caption(f"#{rank}")
@@ -240,15 +240,15 @@ def _action_list(limit=5):
             if task.get("notes"):
                 st.caption("Notes: " + str(task["notes"])[:200])
             c1, c2, c3 = st.columns([1, 1.4, 1], gap="small")
-            if c1.button("✓ Done", key=f"rec_done_{task['id']}",
+            if c1.button("✓ Done", key=f"{scope}_rec_done_{task['id']}",
                          use_container_width=True):
                 toggle_complete(task["id"], True)
                 st.rerun()
-            if c2.button("↑ Important", key=f"rec_raise_{task['id']}",
+            if c2.button("↑ Important", key=f"{scope}_rec_raise_{task['id']}",
                          use_container_width=True):
                 set_priority(task["id"], min(4, int(task.get("priority_level") or 2) + 1))
                 st.rerun()
-            if c3.button("Edit", key=f"rec_edit_{task['id']}",
+            if c3.button("Edit", key=f"{scope}_rec_edit_{task['id']}",
                          use_container_width=True):
                 _choose_item(task["id"])
                 st.rerun()
@@ -335,7 +335,7 @@ def calendar_page():
                    "Use Month / Week / Day / Agenda to switch views. Times are shown "
                    "in your browser's local timezone.")
         st.markdown("#### Your next moves")
-        _action_list(limit=4)
+        _action_list(limit=4, scope="calendar")
 
     with right:
         st.markdown("#### 🎯 What to do now")
@@ -366,7 +366,7 @@ def calendar_page():
             _new_item(kind="event")
             st.rerun()
         with st.container(border=True, key="planner_editor_panel"):
-            _render_editor()
+            _render_editor(scope="calendar")
         with st.expander("What's on the selected day?"):
             selected = st.session_state.get("planner_new_date", today)
             if not isinstance(selected, date):
@@ -403,7 +403,7 @@ def tasks_page():
         st.markdown("### What should I do next?")
         st.caption("Sorted by real due dates and your priorities. Explanations are "
                    "shown for every recommendation.")
-        _action_list(limit=12)
+        _action_list(limit=12, scope="priorities")
         st.divider()
         with st.expander("All open tasks"):
             for task in open_tasks():
