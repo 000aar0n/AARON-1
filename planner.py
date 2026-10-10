@@ -519,7 +519,7 @@ def _occurrence_days(item, start=None, end=None):
     if start is not None:
         first_visible = normalize_as_date(start)
         if first_visible > first:
-            first += timedelta(days=7 * ((first_visible-first).days + 6)//7)
+            first += timedelta(days=7 * (((first_visible - first).days + 6) // 7))
     if end is not None:
         last = min(last, normalize_as_date(end) - timedelta(days=1))
     # A three-year max series bound is enforced by validate_fields().
