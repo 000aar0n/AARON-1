@@ -9,6 +9,7 @@ import streamlit as st
 from streamlit_calendar import calendar
 
 from assistant_core import learn_priority
+from winter_arc import upcoming_workout
 from planner import (
     PRIORITY_NAMES, all_tasks, calendar_events, clear_manually_added_tasks,
     create_item, daily_items, delete_item, get_item, items_for_calendar,
@@ -270,6 +271,19 @@ def calendar_page():
     )
     actions = next_actions(10)
     today = date.today()
+    upcoming = upcoming_workout(today)
+    if upcoming:
+        workout_day, kind = upcoming
+        if workout_day == today:
+            st.info(
+                f"🏋️ **Winter Arc reminder · Today: {kind}** "
+                "— Open today's event for the full exercise list and reps."
+            )
+        else:
+            st.caption(
+                f"🏋️ Next Winter Arc session: {workout_day.strftime('%a, %b %d')} "
+                f"· {kind}. The plan ends December 30, 2026."
+            )
     today_items = daily_items(today)
     all_open = open_tasks()
     a, b, c = st.columns(3)
