@@ -114,10 +114,10 @@ class AssistantTests(unittest.TestCase):
             core.set_task_due_date(task_id, "tomorrow")
 
     def test_calendar_displays_imported_school_assignments(self):
-        ics = (b"BEGIN:VCALENDAR\\r\\nVERSION:2.0\\r\\n"
-               b"BEGIN:VEVENT\\r\\nUID:science-test\\r\\n"
-               b"DTSTART;VALUE=DATE:20261020\\r\\n"
-               b"SUMMARY:Science test\\r\\nEND:VEVENT\\r\\nEND:VCALENDAR\\r\\n")
+        ics = (b"BEGIN:VCALENDAR\r\nVERSION:2.0\r\n"
+               b"BEGIN:VEVENT\r\nUID:science-test\r\n"
+               b"DTSTART;VALUE=DATE:20261020\r\n"
+               b"SUMMARY:Science test\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n")
         self.assertEqual(core.parse_ics(ics), 1)
         october = core.tasks_due_in_month(2026, 10)
         self.assertEqual(len(october), 1)
