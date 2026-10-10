@@ -1,7 +1,7 @@
 name: Verify AARON-1
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, 'fix/strict-calendar-grounding']
   workflow_dispatch:
 
 permissions:
