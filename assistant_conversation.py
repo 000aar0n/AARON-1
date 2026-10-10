@@ -174,7 +174,7 @@ def _read_calendar_question(lower, today):
                 matches[:5], "upcoming " + name, max_events=5
             )
         return (
-            "I have **no verified upcoming **" + name +
+            "I have no verified upcoming **" + name +
             "** class/event on your personal schedule. "
             "A school-wide import is not proof that you're enrolled. "
             "Use Planner → Review imported classes to confirm your own; "
