@@ -223,7 +223,19 @@ def review_imported_groups(*, search="", limit=75):
             }
         else:
             group["occurrences"] += 1
-    return list(groups.values())[:max(1, min(limit, 1000))]
+    # Prefer upcoming series, then recently finished classes, rather than
+    # forcing users to scroll through years of old school-calendar exports.
+    today = date.today().isoformat()
+    ordered = sorted(
+        groups.values(),
+        key=lambda group: (
+            group["first_date"] < today,
+            group["first_date"] if group["first_date"] >= today
+            else "".join(chr(255 - ord(c)) for c in group["first_date"]),
+            group["title"].casefold(),
+        ),
+    )
+    return ordered[:max(1, min(limit, 1000))]
 
 
 def set_imported_personal_status(item_id, status):
