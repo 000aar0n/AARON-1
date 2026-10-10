@@ -455,6 +455,71 @@ def _calendar_editor_dialog():
         st.rerun()
 
 
+def _readable_week_agenda():
+    """A true full-title fallback, independent of FullCalendar's iframe sizing.
+
+    Each item is an actual Streamlit button with auto-wrapping text. This
+    makes even heavily-overlapping classes and 150-character event names
+    readable without opening popups just to identify them.
+    """
+    st.markdown("#### 📖 Every title, fully readable")
+    chosen_day = st.date_input(
+        "Show events for the week containing",
+        value=date.today(),
+        key="planner_readable_week_date",
+    )
+    start = chosen_day - timedelta(days=chosen_day.weekday())
+    st.caption(
+        f"{start.strftime('%b %d')} – "
+        f"{(start + timedelta(days=6)).strftime('%b %d, %Y')} · "
+        "Click any full event name to open it. Scroll within this list."
+    )
+    any_events = False
+    with st.container(
+        height=390, border=True, key="planner_readable_titles_window"
+    ):
+        for offset in range(7):
+            day = start + timedelta(days=offset)
+            items = daily_items(day)
+            if not items:
+                continue
+            any_events = True
+            st.markdown(f"**{day.strftime('%A, %b %d')}**")
+            for item in items:
+                color_name = effective_color_name(item)
+                color = EVENT_COLORS[color_name]
+                when = (
+                    _safe_clock(item["due_time"]).strftime("%I:%M %p").lstrip("0")
+                    if item.get("due_time") else "All day"
+                )
+                c_time, c_name = st.columns([1.15, 7], gap="small")
+                with c_time:
+                    # Color from the fixed, validated application palette only.
+                    st.markdown(
+                        '<div style="margin-top:11px;font-size:12px;'
+                        'font-weight:750;white-space:normal;color:' +
+                        color + ';">● ' + html.escape(when) + '</div>',
+                        unsafe_allow_html=True,
+                    )
+                with c_name:
+                    display_title = str(item["title"])
+                    if item.get("completed"):
+                        display_title = "✓ " + display_title
+                    if item.get("repeat_weekly"):
+                        display_title = "↻ " + display_title
+                    event_ref = item["id"]
+                    if item.get("repeat_weekly"):
+                        event_ref += "::" + day.isoformat()
+                    if st.button(
+                        display_title, key=f"planner_read_full_{day.isoformat()}_{item['id']}",
+                        use_container_width=True,
+                    ):
+                        _open_calendar_popup(item_id=event_ref)
+            st.divider()
+        if not any_events:
+            st.info("No events or assignments this week.")
+
+
 def calendar_page():
     from ui_theme import page_heading, metric
     page_heading(
@@ -623,6 +688,10 @@ def calendar_page():
         "instead of squeezing them into tiny hour blocks. Hour Grid is still "
         "available. Click a class or assignment to open its details."
     )
+
+    # Full titles remain accessible even when the embedded time-grid can't
+    # display them because a scheduled event is too short or overlaps another.
+    _readable_week_agenda()
 
     # Keep the planner itself uncluttered; supporting panels sit BELOW it.
     with st.expander("🎯 Your next moves", expanded=False):
