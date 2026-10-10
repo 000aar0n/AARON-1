@@ -243,9 +243,9 @@ def review_imported_groups(*, search="", limit=75):
     ordered = sorted(
         groups.values(),
         key=lambda group: (
-            group["first_date"] < today,
-            group["first_date"] if group["first_date"] >= today
-            else "".join(chr(255 - ord(c)) for c in group["first_date"]),
+            0 if group["first_date"] >= today else 1,
+            (1 if group["first_date"] >= today else -1) *
+            date.fromisoformat(group["first_date"]).toordinal(),
             group["title"].casefold(),
         ),
     )
