@@ -388,21 +388,24 @@ def main():
 
     install_theme()
 
-    # Display only one page at a time. No redundant top-level tab strip.
+    # Native multi-page navigation: independent URLs and a single rendered view.
+    pages = [
+        st.Page(render_planner_workspace, title="Planner",
+                url_path="planner", default=True),
+        st.Page(render_chat, title="Chat", url_path="chat"),
+        st.Page(lambda: training_page(messages(limit=120)),
+                title="Model Lab", url_path="model-lab"),
+        st.Page(render_connections, title="Settings", url_path="settings"),
+    ]
+    current_page = st.navigation(pages, position="sidebar")
     with st.sidebar:
-        st.markdown("**AARON—1**")
-        st.caption("WORKSPACE")
-        section = st.radio(
-            "Navigation", ["Planner", "Chat", "Model Lab", "Settings"],
-            label_visibility="collapsed", key="aaron_section"
-        )
         st.divider()
+        st.caption("AARON—1")
         st.caption("Storage on this Render service is temporary.")
         st.caption("Back up your calendar before any deployment.")
 
     header()
-
-    # Complete the OAuth callback regardless of the section selected.
+    # OAuth callbacks return to the root, independent of the active page.
     if "code" in st.query_params or "error" in st.query_params:
         try:
             finish_auth(st.query_params.to_dict())
@@ -412,14 +415,7 @@ def main():
             st.query_params.clear()
             st.error(f"Gmail connection failed: {exc}")
 
-    if section == "Planner":
-        render_planner_workspace()
-    elif section == "Chat":
-        render_chat()
-    elif section == "Model Lab":
-        training_page(messages(limit=120))
-    else:
-        render_connections()
+    current_page.run()
 
     st.markdown(
         '<div class="muted-line" style="margin-top:32px;padding-top:18px;'
