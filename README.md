@@ -83,12 +83,28 @@ privately; never share credentials from logs.
 
 ### Unicode and special characters
 
-Titles, notes, event names and chat history use UTF-8 and are never converted
-to ASCII. Display fonts fall back to installed system CJK, symbol, math and
-emoji families. The explicit **Send** button in Chat avoids IME composition
-committing partial Chinese Pinyin messages. Glyph appearance depends on the
-viewer's browser and installed fonts; no website can guarantee that *every*
-Unicode glyph looks identical on all devices.
+Titles, notes, event names and chat history use Unicode and are not converted
+to ASCII. The main Streamlit interface **and separate FullCalendar iframe**
+load actual browser fonts from Google Fonts: Noto Sans SC/JP/KR/Arabic, Noto
+Sans Math, Noto Sans Symbols 2 and Noto Emoji. They fall back to local macOS,
+Windows or Linux fonts when the CDN is unreachable. Native input boxes and
+calendar event labels explicitly inherit the same font stack.
+
+To check rendering, open **Settings → Character and symbol display test**.
+It shows Chinese (中文), Japanese, Korean, mathematical symbols (∑ ∫ ∠ ⊥),
+punctuation and emoji, plus an input box. This is a visual test of actual
+Unicode text, not images and not a database write. Even when Turso is
+unavailable, the startup recovery screen includes a short Unicode probe.
+If glyphs show as boxes, try a hard refresh (Cmd/Ctrl + Shift + R), then
+verify your network allows **fonts.googleapis.com** and **fonts.gstatic.com**.
+If the samples work but imported event titles are missing, investigate the
+calendar import/data separately from font display.
+
+The explicit **Send** button in Chat avoids sending incomplete Pinyin IME
+composition. Emoji appearance and rare glyph coverage vary across browsers,
+and a third-party font service receives ordinary browser font requests,
+potentially including visitors' IP addresses. No font can guarantee coverage
+of every Unicode character.
 
 ## 🪟 Windows 10/11 (no administrator privileges required)
 

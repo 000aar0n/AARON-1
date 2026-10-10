@@ -6,9 +6,11 @@ from __future__ import annotations
 
 import html
 import streamlit as st
+from unicode_support import FONT_IMPORT, FONT_STACK
 
 STYLE = r"""
 <style>
+UNICODE_FONT_IMPORT
 :root {
   --a-bg:#0d0f11;
   --a-panel:#141719;
@@ -21,11 +23,7 @@ STYLE = r"""
 html,body,[data-testid="stAppViewContainer"],[data-testid="stMain"] {
   background:var(--a-bg)!important;color:var(--a-text)!important;
   /* Browser-native CJK fallbacks: no font uploads or server dependencies. */
-  font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",
-    "PingFang SC","Hiragino Sans GB","Microsoft YaHei",
-    "Noto Sans CJK SC","Noto Sans SC","WenQuanYi Micro Hei","Segoe UI Symbol",
-    "Noto Sans Symbols 2","Noto Sans Math","Apple Color Emoji",
-    "Segoe UI Emoji","Noto Color Emoji",sans-serif;
+  font-family:UNICODE_FONT_STACK;
 }
 [data-testid="stHeader"]{background:transparent!important}
 [data-testid="stMainBlockContainer"] {
@@ -77,11 +75,7 @@ button,button[kind],button[data-baseweb],input,textarea,select,
 [data-testid="stMarkdownContainer"],[data-testid="stChatMessage"],
 [data-testid="stTextArea"],[data-testid="stTextInput"],
 [data-testid="stForm"]{
-  font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",
-    "PingFang SC","Hiragino Sans GB","Microsoft YaHei",
-    "Noto Sans CJK SC","Noto Sans SC","WenQuanYi Micro Hei","Segoe UI Symbol",
-    "Noto Sans Symbols 2","Noto Sans Math","Apple Color Emoji",
-    "Segoe UI Emoji","Noto Color Emoji",sans-serif!important;
+  font-family:UNICODE_FONT_STACK!important;
 }
 div[data-testid="stButton"]>button,
 div[data-testid="stFormSubmitButton"]>button,
@@ -212,7 +206,7 @@ hr{border-color:var(--a-border)!important}
  .fc .fc-toolbar-title{font-size:15px!important}
 }
 </style>
-"""
+""".replace("UNICODE_FONT_IMPORT", FONT_IMPORT).replace("UNICODE_FONT_STACK", FONT_STACK)
 
 def install_theme():
     st.markdown(STYLE, unsafe_allow_html=True)

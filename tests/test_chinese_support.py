@@ -47,8 +47,11 @@ class ChineseSupportTest(unittest.TestCase):
         self.assertNotIn('st.chat_input(', app)
         theme = (root / "ui_theme.py").read_text(encoding="utf-8")
         calendar = (root / "planner_ui.py").read_text(encoding="utf-8")
-        self.assertIn("PingFang SC", theme)
-        self.assertIn("Microsoft YaHei", calendar)
+        from unicode_support import FONT_STACK
+        self.assertIn("PingFang SC", FONT_STACK)
+        self.assertIn("Microsoft YaHei", FONT_STACK)
+        self.assertIn("from unicode_support import FONT_IMPORT, FONT_STACK", theme)
+        self.assertIn("from unicode_support import FONT_IMPORT, FONT_STACK", calendar)
 
 
 if __name__ == "__main__":
