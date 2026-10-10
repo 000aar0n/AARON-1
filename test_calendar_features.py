@@ -216,7 +216,7 @@ class CalendarFeatureTests(unittest.TestCase):
 
     def test_full_app_has_color_weekly_and_assignment_controls(self):
         from app import APP_BUILD
-        self.assertIn("calendar-v5", APP_BUILD)
+        self.assertIn("calendar-popup-v6", APP_BUILD)
         series = self.create_weekly()
         planner.create_item(title="Class assignment", linked_event_id=series)
         app = AppTest.from_file(
@@ -227,10 +227,14 @@ class CalendarFeatureTests(unittest.TestCase):
             len(app.exception), 0,
             repr([x.message for x in app.exception]),
         )
-        self.assertIn("calendar_planner_0_color", [x.key for x in app.selectbox])
+        # The calendar editor is now built inside a modal on demand.
+        self.assertNotIn("calendar_planner_0_color", [x.key for x in app.selectbox])
         self.assertIn("priorities_planner_0_color", [x.key for x in app.selectbox])
-        # Both editors are constructed simultaneously by st.tabs.
-        self.assertIn("calendar_planner_0_type", [x.key for x in app.get("segmented_control")])
+        app.button(key="planner_new_event").click().run()
+        self.assertEqual(len(app.exception), 0, repr([e.message for e in app.exception]))
+        self.assertIn("calendar_planner_1_color", [x.key for x in app.selectbox])
+        self.assertIn("priorities_planner_1_color", [x.key for x in app.selectbox])
+        self.assertIn("calendar_planner_1_type", [x.key for x in app.get("segmented_control")])
 
     def test_form_select_weekly_and_attached_assignment(self):
         script = """
