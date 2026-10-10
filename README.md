@@ -96,6 +96,36 @@ also shows today's workout or the next workout as a reminder when you open
 the app. AARON-1 itself doesn't issue push alerts when closed; use scheduled
 phone/ChatGPT notifications for that.
 
+## Calendar color coding, weekly events, and attached assignments
+
+In **Planner**, click an existing calendar item or **+ Event** / **+ New task**.
+Each editor has a **Calendar color** dropdown; choose Blue, Purple, Teal,
+Green, Orange, Pink, Red or Slate, or leave **Auto**. Auto colors distinguish
+imported Google Calendar appointments, Winter Arc workouts, ordinary events,
+and task priority. Linked assignments inherit their event color automatically
+unless you choose a custom color.
+
+To make a repeating class, choose **Event**, check **Repeat every week**, set
+the first date/time, choose **Repeat weekly until**, and save. AARON-1 creates
+virtual weekly occurrences from one saved event record (no duplicate database
+rows). Click any occurrence to edit **the entire series**, including its end
+date and color; deleting the parent removes the series. This simple weekly
+option repeats on the weekday of the first occurrence, through the inclusive
+end date (up to three years). It does not support individual occurrence
+exceptions; imported Google recurring events retain their separately expanded
+calendar instances and are not modified at Google.
+
+To attach homework to class, open the **Task** editor and pick
+**Attach assignment to an event**. Or click a class event and choose
+**Add assignment to this event**; attached tasks appear directly in that
+event's editor, but retain independent deadlines, completion status and
+priority. An assignment attached to a repeating event is linked to the whole
+series. Deleting the class event does *not* delete the homework: it removes
+the relationship and keeps the task.
+
+Calendar titles are bolder and use multi-line wrapping in Week, Day, Month and
+Agenda views. These features are all local; they don't edit Google Calendar.
+
 ## No Ollama needed: talk to pretrained AARON-1
 
 You **do not need Ollama**. AARON-1 can now run the Qwen2.5 0.5B-Instruct language model directly with PyTorch/Transformers, even **before you have any fine-tuning examples**. This model already understands basic language; it won't initially have a personality tailored to you. Fine-tune it later from the **Train AARON-1** tab.
