@@ -126,8 +126,10 @@ def validate_fields(*, title, due, due_time, description, item_type, priority,
                 linked_event_id=linked_event_id)
 
 
-def _validate_link(db, fields):
+def _validate_link(db, fields, *, updating_id=None):
     linked = fields["linked_event_id"]
+    if linked and linked == updating_id:
+        raise ValueError("An event cannot be attached to itself")
     if linked:
         record = db.execute(
             "SELECT id FROM tasks WHERE id=? AND item_type='event'", (linked,)
@@ -188,7 +190,7 @@ def update_item(item_id, *, title, due=None, due_time=None, description="",
     )
     ensure_schema()
     with connect() as db:
-        _validate_link(db, fields)
+        _validate_link(db, fields, updating_id=item_id)
         # Converting an event into a task detaches its assignment relationships.
         if item_type != "event":
             db.execute("UPDATE tasks SET linked_event_id=NULL WHERE linked_event_id=?", (item_id,))
@@ -562,7 +564,10 @@ def calendar_events(items, *, start=None, end=None):
             calendar_id = (
                 item["id"] + "::" + day if item.get("repeat_weekly") else item["id"]
             )
-            title_prefix = "✓ " if is_done else "↻ " if item.get("repeat_weekly") else ""
+            title_prefix = (
+                "✓ " if is_done else "↻ " if item.get("repeat_weekly")
+                else "📎 " if item.get("linked_event_id") else ""
+            )
             start_at = f"{day}T{hm}:00" if hm else day
             record = {
                 "id": calendar_id, "title": title_prefix + item["title"],
