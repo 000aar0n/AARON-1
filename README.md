@@ -1,6 +1,6 @@
 # 🤖 AARON-1 — your personal assistant
 
-**One assistant. Five tabs. Persistent memory, tools and a genuinely fine-tunable local conversational model.**
+**One assistant. Five tabs. Persistent memory, Google Calendar ZIP import, Winter Arc workouts, and a fine-tunable local conversational model.**
 
 This version has replaced the sender/receiver, evolution, and sandbox-network experiments. Old experiment source files were removed. Files and checkpoints already saved on your computer under `data/` were **not deleted**; previously taught personal facts are migrated into the new task database.
 
@@ -56,6 +56,45 @@ Then run the explicitly confirmed one-time operation:
 
 This command runs only on your computer; GitHub and ChatGPT cannot see or
 directly wipe your local task database. It prints the location of the backup.
+
+## Google Calendar ZIP import + Winter Arc reminders (October 2026)
+
+The **Connections → Google Calendar — private import** panel accepts either
+`.ics` files or Google's original `.ics.zip` downloads **without unzipping**.
+A typical export can decompress to 16 MB or more: the importer safely handles
+up to **40 MB of uncompressed calendar data**, without the old 2 MB school
+calendar import limit. It skips older events outside your selected date range,
+preserves original start/end times (including all-day and multi-day events),
+expands recurring instances, applies moved/cancelled sessions, and avoids
+duplicates when importing the same archive again.
+
+**On your Mac with the existing Python 3.12 environment:**
+
+```bash
+cd ~/AARON-1
+git pull --ff-only origin main
+.venv312/bin/python -m pip install -r requirements.txt
+.venv312/bin/python -m streamlit run app.py
+```
+
+Look for **AARON-1 build 2026.10.10-calendar-winterarc-v4** near the top.
+Then open **Connections → Google Calendar**, drag in the ZIP, and click
+**Import Google Calendar**. The default range is from 30 days ago through
+18 months afterward; choose a different range before importing if needed.
+This is a **one-time local copy**, not continuous sync, and it does not change
+your actual Google account or require Google OAuth. The personal calendar file
+and imported SQLite data are excluded from GitHub. **Never commit the ZIP, ICS,
+or a copied personal database to a public repository.**
+
+The first updated launch also seeds the requested **Winter Arc** workouts from
+**October 8 through December 30, 2026**: **Monday/Thursday Push + Core** and
+**Tuesday/Friday Pull + Legs**. There are 48 all-day workout calendar entries,
+each with the exact exercise list and rep targets from the Winter Arc tracker.
+The last training date is December 29; December 30 is a recovery day. You can
+edit or delete a workout and the app won't re-add it on later reruns. Planner
+also shows today's workout or the next workout as a reminder when you open
+the app. AARON-1 itself doesn't issue push alerts when closed; use scheduled
+phone/ChatGPT notifications for that.
 
 ## No Ollama needed: talk to pretrained AARON-1
 
