@@ -110,6 +110,19 @@ class UnicodePersistenceTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "BOTH"):
                 connect()
 
+    def test_no_password_gate_and_turso_credentials_preserved(self):
+        root = Path(__file__).resolve().parents[1]
+        app = (root / "app.py").read_text(encoding="utf-8")
+        readme = (root / "README.md").read_text(encoding="utf-8")
+        core = (root / "assistant_core.py").read_text(encoding="utf-8")
+        self.assertNotIn("APP_PASSWORD", app)
+        self.assertNotIn("_require_password_if_configured", app)
+        self.assertNotIn("aaron_password_gate", app)
+        self.assertNotIn("APP_PASSWORD", readme)
+        self.assertIn("TURSO_DATABASE_URL", core)
+        self.assertIn("TURSO_AUTH_TOKEN", core)
+        self.assertIn("private app visibility", readme)
+
     def test_unicode_fonts_and_safe_explicit_composer_present(self):
         root = Path(__file__).resolve().parents[1]
         theme = (root / "ui_theme.py").read_text(encoding="utf-8")
