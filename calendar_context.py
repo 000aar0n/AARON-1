@@ -85,7 +85,7 @@ def format_schedule(entries, label, *, max_events=35):
         linked_id = item.get("linked_event_id")
         if linked_id and is_task:
             parent = get_item(linked_id)
-            if parent:
+            if parent and is_verified_personal(parent):
                 annotation += " · for " + parent["title"][:80]
         lines.append(f"• {when} — **{name}** ({annotation})")
     if len(entries) > max_events:
@@ -153,7 +153,7 @@ def calendar_model_context(*, today=None, days=14, max_events=48):
             extras.append("completed")
         if item.get("linked_event_id"):
             parent = get_item(item["linked_event_id"])
-            if parent:
+            if parent and is_verified_personal(parent):
                 extras.append("assignment for " + " ".join(
                     parent["title"].split())[:70])
         notes = " ".join((item.get("notes") or "").split())[:100]
