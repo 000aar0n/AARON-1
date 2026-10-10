@@ -89,6 +89,8 @@ def training_page(history):
         )
         if st.button("Use base model instead", key="training_disable"):
             deactivate_trained()
+            st.session_state.pop("aaron_selected_chat_model", None)
+            st.session_state.pop("aaron_model_picker", None)
             st.rerun()
     st.caption(
         "Your planner, tasks and memories are separate from language-model "
@@ -266,14 +268,23 @@ def training_page(history):
                         st.caption("Hardware: " + str(job["device"]))
                     if job.get("metrics"):
                         scores = job["metrics"]
-                        st.write(
-                            f"Training loss: {scores.get('train_loss', 0):.3f}"
-                        )
+                        train_loss = scores.get("train_loss")
+                        if train_loss is not None:
+                            st.write(f"Training loss: {train_loss:.3f}")
+                        base_loss = scores.get("baseline_eval_loss")
                         val = scores.get("eval_loss")
-                        if val is not None:
-                            st.write(f"Held-out validation loss: {val:.3f}")
-                        st.caption("Lower validation loss is better. Compare "
-                                   "against a baseline before trusting changes.")
+                        if base_loss is not None and val is not None:
+                            st.write(
+                                f"Held-out validation loss: {base_loss:.3f} → {val:.3f}"
+                            )
+                            if val > base_loss:
+                                st.warning("Validation loss increased: this "
+                                           "training may have made the model worse.")
+                            else:
+                                st.success("Lower held-out loss after training. "
+                                           "Test real prompts before relying on it.")
+                        st.caption("Validation loss on a tiny private dataset "
+                                   "is not a general intelligence score.")
                     if job.get("error"):
                         st.error(str(job["error"]))
                     logfile = JOB_HOME / (job["id"] + ".log")
@@ -293,6 +304,10 @@ def training_page(history):
                         ):
                             try:
                                 activate_trained(job["id"])
+                                st.session_state["aaron_selected_chat_model"] = (
+                                    "__aaron_trained__"
+                                )
+                                st.session_state.pop("aaron_model_picker", None)
                                 st.toast("Trained AARON-1 activated for Chat")
                                 st.rerun()
                             except ValueError as exc:
