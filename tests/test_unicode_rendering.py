@@ -1,10 +1,28 @@
 """Check actual Unicode font loading in Streamlit and embedded FullCalendar."""
+import ast
 from pathlib import Path
 import unittest
 
 from unicode_support import FONT_IMPORT, FONT_STACK, UNICODE_SAMPLES
-from ui_theme import STYLE
-from planner_ui import CALENDAR_CSS
+
+
+def css_from_source(path, variable):
+    """Evaluate only the module-level CSS string without needing Streamlit."""
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for node in tree.body:
+        if (isinstance(node, ast.Assign) and
+                any(isinstance(t, ast.Name) and t.id == variable for t in node.targets)):
+            return eval(
+                compile(ast.Expression(node.value), str(path), "eval"),
+                {"__builtins__": {}},
+                {"FONT_IMPORT": FONT_IMPORT, "FONT_STACK": FONT_STACK},
+            )
+    raise AssertionError("CSS variable not found: " + variable)
+
+
+ROOT = Path(__file__).resolve().parents[1]
+STYLE = css_from_source(ROOT / "ui_theme.py", "STYLE")
+CALENDAR_CSS = css_from_source(ROOT / "planner_ui.py", "CALENDAR_CSS")
 
 
 class UnicodeRenderingTest(unittest.TestCase):
