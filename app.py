@@ -26,7 +26,7 @@ from training_ui import training_page
 from training_data import trained_model
 from trained_chat import inference_dependencies_ready
 
-APP_BUILD = "2026.10.10-aligned-calendar-v10"
+APP_BUILD = "2026.10.10-minimal-workspace"
 
 st.set_page_config(page_title="AARON-1", page_icon="🤖", layout="wide")
 
@@ -269,150 +269,90 @@ def available_local_models():
 
 
 def render_chat():
+    """Dedicated conversation view; settings never crowd the message stream."""
     page_heading(
-        "Talk to AARON-1", "Your personal AI",
-        "Ask about your day, make plans, and have real conversations "
-        "when you enable a local chat model.",
+        "ASSISTANT", "Chat",
+        "Plan your week, ask about your saved calendar, or talk to a local model.",
     )
-    with st.expander("🧠 Conversation settings", expanded=False):
-        active_adapter = trained_model()
-        ready = inference_dependencies_ready()
-        ollama_options = available_local_models()
-        # Direct Transformers inference needs no Ollama installation.
-        options = (
-            ["AARON-1 (pretrained · no Ollama)"] if ready else []
-        ) + (
-            ["AARON-1 (fine-tuned)"] if active_adapter else []
-        ) + ["Planner only (rules)"] + ollama_options
+    local = not bool(__import__("os").environ.get("RENDER"))
+    active_adapter = trained_model() if local else None
+    ready = inference_dependencies_ready() if local else False
+    ollama_options = available_local_models() if local else []
+    options = ["Planner (available everywhere)"]
+    if ready:
+        options.append("AARON-1 base (local)")
+    if active_adapter and inference_dependencies_ready(adapter=True):
+        options.append("AARON-1 trained (local)")
+    options.extend(ollama_options)
 
-        current = st.session_state.get("aaron_selected_chat_model")
-        current_label = (
-            "AARON-1 (fine-tuned)" if current == "__aaron_trained__"
-            else "AARON-1 (pretrained · no Ollama)" if current == "__aaron_base__"
-            else current if current in options else None
-        )
-        if current_label not in options:
-            current_label = (
-                "AARON-1 (fine-tuned)" if active_adapter and
-                inference_dependencies_ready(adapter=True)
-                else "AARON-1 (pretrained · no Ollama)" if ready
-                else ollama_options[0] if ollama_options
-                else "Planner only (rules)"
-            )
-        if st.session_state.get("aaron_model_picker") not in options:
-            st.session_state.pop("aaron_model_picker", None)
-        choice = st.selectbox(
-            "Conversation engine", options,
-            index=options.index(current_label),
-            help="The pretrained model runs in Python, without Ollama. "
-                 "A trained adapter is optional. Tasks change only through "
-                 "verified commands.",
+    current = st.session_state.get("aaron_selected_chat_model")
+    desired = (
+        "AARON-1 trained (local)" if current == "__aaron_trained__"
+        else "AARON-1 base (local)" if current == "__aaron_base__"
+        else current if current in ollama_options
+        else options[0]
+    )
+    if desired not in options:
+        desired = options[0]
+    if st.session_state.get("aaron_model_picker") not in options:
+        st.session_state.pop("aaron_model_picker", None)
+    model_col, detail_col = st.columns([2, 3], vertical_alignment="bottom")
+    with model_col:
+        selected = st.selectbox(
+            "Conversation engine", options, index=options.index(desired),
             key="aaron_model_picker",
         )
-        st.session_state["aaron_selected_chat_model"] = (
-            "__aaron_trained__" if choice == "AARON-1 (fine-tuned)"
-            else "__aaron_base__" if choice == "AARON-1 (pretrained · no Ollama)"
-            else None if choice == "Planner only (rules)"
-            else choice
-        )
-        if choice == "AARON-1 (pretrained · no Ollama)":
-            st.success("No Ollama needed. Qwen2.5 0.5B runs through PyTorch. "
-                       "The first message downloads and caches the model.")
-        elif choice == "AARON-1 (fine-tuned)":
-            st.success("Using your fine-tuned adapter with the pretrained "
-                       "Qwen base model. No Ollama needed.")
-        elif choice in ollama_options:
-            st.success("Using optional local Ollama.")
-        else:
-            st.info("Rule-based planner chat is active. For natural "
-                    "conversations, install the training dependencies below.")
-        if not ready:
-            st.caption("One-time setup for pretrained chat and fine-tuning:")
-            st.code(
-                "python3 -m pip install -r requirements-training.txt",
-                language="bash",
-            )
-        st.caption("Conversation runs on your computer, not ChatGPT's servers. "
-                   "The model's base weights come from Hugging Face once; "
-                   "your tasks and memories remain local.")
-        if st.button("Refresh local models", key="refresh_local_models"):
-            available_local_models.clear()
-            st.rerun()
-
-    st.caption(
-        "📅 AARON-1 can read your imported classes, recurring events, and "
-        "attached assignments locally. Try **what's on my calendar this week?** "
-        "or **when is my next chemistry class?**"
-    )
-    with st.expander("🔎 Check the exact calendar records AARON-1 is reading", expanded=False):
-        from calendar_context import schedule_for_range
-        chosen = st.date_input(
-            "Starting date", value=date.today(),
-            key="aaron_calendar_evidence_start",
-        )
-        try:
-            saved = schedule_for_range(
-                chosen, chosen + timedelta(days=7), limit=400
-            )
+    with detail_col:
+        if selected == options[0]:
             st.caption(
-                f"{len(saved)} saved calendar item(s) found for these 7 days. "
-                "These titles, dates and times come from local SQLite; "
-                "an AI-generated class not on this list is NOT evidence of "
-                "a real event. Historical chat replies may contain errors."
+                "Calendar and task commands are live. Open-ended language "
+                "model chat requires local inference."
             )
-            if saved:
-                st.dataframe(
-                    [
-                        {
-                            "Date": item["due"],
-                            "Time": item.get("due_time") or "All day",
-                            "Exact saved title": item["title"],
-                            "Type": item.get("item_type") or "task",
-                            "Source": item.get("source") or "local",
-                            "Record ID": item["id"],
-                        }
-                        for item in saved
-                    ],
-                    use_container_width=True,
-                    hide_index=True,
-                )
-            else:
-                st.info(
-                    "No items were found for this week. You may need to "
-                    "import the latest Google Calendar export in Connections."
-                )
-        except (ValueError, OSError) as exc:
-            st.error(f"Could not load calendar records: {exc}")
+        else:
+            st.caption("Model runs on the machine hosting AARON-1.")
+    st.session_state["aaron_selected_chat_model"] = (
+        "__aaron_trained__" if selected == "AARON-1 trained (local)"
+        else "__aaron_base__" if selected == "AARON-1 base (local)"
+        else None if selected == options[0] else selected
+    )
 
-    previous = messages(limit=60)
-    # Fixed-height, independently scrolling conversation. The entry box stays
-    # OUTSIDE this container so long chats never push it off-screen.
-    with st.container(
-        height=550, border=True, key="aaron_chat_scroll_window"
-    ):
+    previous = messages(limit=80)
+    with st.container(height=600, border=True, key="aaron_chat_scroll_window"):
         if not previous:
-            st.markdown(
-                "Ask me something, for example **what's on my calendar "
-                "this week?**, **what's due tomorrow?**, or "
-                "**add task finish chemistry due tomorrow at 5pm**."
+            st.markdown("**Start a conversation**")
+            st.caption(
+                "Ask what's on your calendar tomorrow, what needs doing, "
+                "or add a task with a due date."
             )
         for item in previous:
-            with st.chat_message(item["role"]):
-                st.markdown(item["message"])
-    prompt = st.chat_input("Talk to AARON-1…", key="aaron_chat_prompt")
-    if prompt:
+            if item["role"] in ("user", "assistant"):
+                with st.chat_message(item["role"]):
+                    st.markdown(item["message"])
+    prompt = st.chat_input("Message AARON-1", key="aaron_chat_prompt")
+    if prompt and prompt.strip():
         history = messages(limit=12)
         write_chat("user", prompt)
-        # Preserve prior context without repeating the latest user message.
-        reply = answer_with_context(prompt, history)
+        try:
+            reply = answer_with_context(prompt, history)
+        except (ValueError, OSError) as exc:
+            reply = f"Couldn't process that request ({type(exc).__name__})."
         write_chat("assistant", reply)
         st.rerun()
 
-    with st.expander("Meet AARON-1", expanded=False):
-        last = (previous[-1]["message"] if previous
-                and previous[-1]["role"] == "assistant"
-                else "Yo! What are we doing today?")
-        render_face(last, key="home")
+    with st.expander("Conversation data", expanded=False):
+        st.caption(
+            "Chat history is stored in the app's SQLite database. "
+            "On Render's free, non-persistent instance it can be lost on redeploy. "
+            "No conversation is automatically used for model training."
+        )
+        st.download_button(
+            "Export chat history",
+            data=__import__("json").dumps(previous, indent=2),
+            file_name="aaron1-chat.json",
+            mime="application/json",
+            disabled=not bool(previous),
+        )
+
 
 
 def answer_with_context(message, history):
@@ -426,6 +366,18 @@ def answer_with_context(message, history):
     return respond(message, previous=history, model=model)[0]
 
 
+def render_planner_workspace():
+    """Calendar and priority tools share one main page."""
+    view = st.segmented_control(
+        "Planner view", ["Calendar", "Tasks"], default="Calendar",
+        key="aaron_planner_view",
+    )
+    if view == "Tasks":
+        render_tasks()
+    else:
+        render_calendar()
+
+
 def main():
     init_chat()
     ensure_schema()
@@ -435,10 +387,22 @@ def main():
     migrate_legacy_facts()
 
     install_theme()
-    header()
-    st.caption("AARON-1 build " + APP_BUILD + " · One clock-aligned week, pinned homework, and grounded chat")
 
-    # Google returns to this same local dashboard after the user approves OAuth.
+    # Display only one page at a time. No redundant top-level tab strip.
+    with st.sidebar:
+        st.markdown("**AARON—1**")
+        st.caption("WORKSPACE")
+        section = st.radio(
+            "Navigation", ["Planner", "Chat", "Model Lab", "Settings"],
+            label_visibility="collapsed", key="aaron_section"
+        )
+        st.divider()
+        st.caption("Storage on this Render service is temporary.")
+        st.caption("Back up your calendar before any deployment.")
+
+    header()
+
+    # Complete the OAuth callback regardless of the section selected.
     if "code" in st.query_params or "error" in st.query_params:
         try:
             finish_auth(st.query_params.to_dict())
@@ -448,29 +412,21 @@ def main():
             st.query_params.clear()
             st.error(f"Gmail connection failed: {exc}")
 
-    calendar_tab, task_tab, chat_tab, train_tab, connection_tab = st.tabs(
-        ["Planner", "Priorities", "Chat", "Train AARON-1", "Connections"]
-    )
-    with calendar_tab:
-        render_calendar()
-    with task_tab:
-        render_tasks()
-    with chat_tab:
+    if section == "Planner":
+        render_planner_workspace()
+    elif section == "Chat":
         render_chat()
-    with train_tab:
+    elif section == "Model Lab":
         training_page(messages(limit=120))
-    with connection_tab:
+    else:
         render_connections()
 
-    _, feedback_count = load_weights()
     st.markdown(
         '<div class="muted-line" style="margin-top:32px;padding-top:18px;'
-        'border-top:1px solid #2a3242;">'
-        f'AARON-1 · {feedback_count} personal priority decisions learned · '
-        'Data saved locally</div>',
+        'border-top:1px solid #303439;">'
+        'AARON—1 · ' + APP_BUILD + '</div>',
         unsafe_allow_html=True,
     )
-
 
 if __name__ == "__main__":
     main()
