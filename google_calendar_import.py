@@ -317,6 +317,13 @@ def import_google_calendar(payload, filename, *, from_date=None, months=18):
     # One transaction: either the entire calendar import succeeds or none.
     with connect() as db:
         for key in removed:
+            # A cancelled imported event must not delete its attached homework.
+            # Detach local assignments first, then remove only the event copy.
+            db.execute(
+                "UPDATE tasks SET linked_event_id=NULL WHERE linked_event_id IN "
+                "(SELECT id FROM tasks WHERE source=? AND external_id=?)",
+                (CALENDAR_SOURCE, key),
+            )
             deleted += db.execute(
                 "DELETE FROM tasks WHERE source=? AND external_id=?",
                 (CALENDAR_SOURCE, key),
