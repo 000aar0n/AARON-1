@@ -113,6 +113,26 @@ class TrainingDataTests(unittest.TestCase):
         data.deactivate_trained()
         self.assertIsNone(data.trained_model())
 
+    def test_continued_training_retains_previous_adapter_link(self):
+        self._populate(10)
+        old = data.create_job()
+        directory = data.MODEL_HOME / old["id"] / "adapter"
+        directory.mkdir(parents=True)
+        (directory / "adapter_config.json").write_text("{}")
+        (directory / "adapter_model.safetensors").write_bytes(b"weights")
+        data.update_job(old["id"], status="completed")
+        data.activate_trained(old["id"])
+        new = data.create_job(model=data.BASE_MODEL)
+        self.assertEqual(new["parent_job_id"], old["id"])
+        restarted = data.create_job(
+            model=data.BASE_MODEL, continue_from_active=False
+        )
+        self.assertIsNone(restarted["parent_job_id"])
+        different = data.create_job(
+            model=data.ALLOWED_BASE_MODELS[1]
+        )
+        self.assertIsNone(different["parent_job_id"])
+
     def test_export_import_uses_only_approved_pairs(self):
         self._populate(8)
         original = data.export_jsonl()
