@@ -19,7 +19,7 @@ from dateutil.rrule import rrulestr
 from icalendar import Calendar
 
 from assistant_core import connect
-from planner import ensure_schema
+from planner import ensure_schema, imported_series_key
 
 CALENDAR_SOURCE = "google_calendar"
 LOCAL_TZ = ZoneInfo("America/New_York")
@@ -320,7 +320,7 @@ def import_google_calendar(payload, filename, *, from_date=None, months=18):
         # subsequent ICS import introduces new occurrences of the same UID.
         # This never infers enrollment from title/teacher similarities.
         known_status = {
-            str(r["external_id"]).rsplit(":", 1)[0]: r["personal_status"]
+            imported_series_key(r["external_id"]): r["personal_status"]
             for r in db.execute(
                 "SELECT external_id, personal_status FROM tasks "
                 "WHERE source=? AND item_type='event' "
@@ -367,7 +367,7 @@ def import_google_calendar(payload, filename, *, from_date=None, months=18):
                      item["due_time"], item["notes"], CALENDAR_SOURCE, key,
                      datetime.now(timezone.utc).isoformat(), "event",
                      item["duration_min"], 30, 2, item["event_end"],
-                     known_status.get(key.rsplit(":", 1)[0], "unverified")),
+                     known_status.get(imported_series_key(key), "unverified")),
                 )
                 created += 1
         db.commit()
