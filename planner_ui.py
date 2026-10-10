@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import html
+import sqlite3
 from datetime import date, datetime, time, timedelta
 
 import streamlit as st
@@ -434,9 +435,12 @@ def _clear_manual_tasks_panel():
         if count == 0:
             st.info("There are no manually added tasks to clear.")
             return
+        # A fresh checkbox is required after each successful clear. Reusing
+        # the same Streamlit key would leave a future deletion pre-approved.
+        nonce = st.session_state.get("priorities_bulk_confirmation_nonce", 0)
         confirmed = st.checkbox(
             f"Yes, remove all {count} manually added tasks",
-            key="priorities_confirm_bulk_delete",
+            key=f"priorities_confirm_bulk_delete_{nonce}",
         )
         if st.button(
             f"Delete my {count} tasks",
@@ -457,8 +461,9 @@ def _clear_manual_tasks_panel():
                     f"Deleted {deleted} manually added tasks. "
                     f"Backup saved at: {backup}"
                 )
+                st.session_state["priorities_bulk_confirmation_nonce"] = nonce + 1
                 st.rerun()
-            except (ValueError, OSError) as exc:
+            except (ValueError, OSError, sqlite3.Error) as exc:
                 st.error(f"Could not clear the tasks: {exc}")
 
 
