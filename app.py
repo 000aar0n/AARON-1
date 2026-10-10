@@ -27,7 +27,7 @@ from trained_chat import inference_dependencies_ready
 
 APP_BUILD = "2026.10.10-minimal-workspace"
 
-st.set_page_config(page_title="AARON-1", page_icon="A", layout="wide")
+st.set_page_config(page_title="AARON-1", page_icon="📅", layout="wide")
 
 
 def init_chat():
