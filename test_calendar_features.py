@@ -216,7 +216,7 @@ class CalendarFeatureTests(unittest.TestCase):
 
     def test_full_app_has_color_weekly_and_assignment_controls(self):
         from app import APP_BUILD
-        self.assertIn("calendar-popup-v6", APP_BUILD)
+        self.assertIn("calendar-chat-v7", APP_BUILD)
         series = self.create_weekly()
         planner.create_item(title="Class assignment", linked_event_id=series)
         app = AppTest.from_file(
