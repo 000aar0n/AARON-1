@@ -173,7 +173,7 @@ def training_page(history):
                 if len(approved) > 120:
                     st.caption("Showing the most recent 120 examples.")
 
-            with st.expander("Transfer approved examples to your gaming PC"):
+            with st.expander("Import and export examples"):
                 st.caption(
                     "Export a JSONL file, then import it on your other machine. "
                     "Only explicitly approved pairs are included. "
