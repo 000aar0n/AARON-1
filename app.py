@@ -344,6 +344,46 @@ def render_chat():
         "attached assignments locally. Try **what's on my calendar this week?** "
         "or **when is my next chemistry class?**"
     )
+    with st.expander("🔎 Check the exact calendar records AARON-1 is reading", expanded=False):
+        from calendar_context import schedule_for_range
+        chosen = st.date_input(
+            "Starting date", value=date.today(),
+            key="aaron_calendar_evidence_start",
+        )
+        try:
+            saved = schedule_for_range(
+                chosen, chosen + timedelta(days=7), limit=400
+            )
+            st.caption(
+                f"{len(saved)} saved calendar item(s) found for these 7 days. "
+                "These titles, dates and times come from local SQLite; "
+                "an AI-generated class not on this list is NOT evidence of "
+                "a real event. Historical chat replies may contain errors."
+            )
+            if saved:
+                st.dataframe(
+                    [
+                        {
+                            "Date": item["due"],
+                            "Time": item.get("due_time") or "All day",
+                            "Exact saved title": item["title"],
+                            "Type": item.get("item_type") or "task",
+                            "Source": item.get("source") or "local",
+                            "Record ID": item["id"],
+                        }
+                        for item in saved
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+            else:
+                st.info(
+                    "No items were found for this week. You may need to "
+                    "import the latest Google Calendar export in Connections."
+                )
+        except (ValueError, OSError) as exc:
+            st.error(f"Could not load calendar records: {exc}")
+
     previous = messages(limit=60)
     # Fixed-height, independently scrolling conversation. The entry box stays
     # OUTSIDE this container so long chats never push it off-screen.
