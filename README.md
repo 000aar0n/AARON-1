@@ -23,7 +23,7 @@ grep -n '_render_editor(scope=' planner_ui.py
 Priorities editors. If Git reports a merge/checkout error, the local files
 are stale; don't delete or reset your work. Resolve the Git error before
 launching the app. In the running UI, look for
-**`AARON-1 build 2026.10.10-verified-classes-v8`** near the top.
+**`AARON-1 build 2026.10.10-grounded-calendar-v9`** near the top.
 Stop any old Streamlit terminals before restarting, and reload the browser.
 
 ### Delete one task or clear all tasks you entered
@@ -94,38 +94,37 @@ also shows today's workout or the next workout as a reminder when you open
 the app. AARON-1 itself doesn't issue push alerts when closed; use scheduled
 phone/ChatGPT notifications for that.
 
-## Important: Imported school calendars are NOT your verified class roster
+## Imported calendar is personal — no manual verification
 
-Some school calendar exports contain **other students' classes**. Simply
-appearing in an ICS or Google Calendar export never means you're enrolled.
-AARON-1 now **hides imported Google entries by default** in its personal
-calendar and excludes them from all chatbot schedule answers and local
-language-model context until you confirm they are yours.
+AARON-1 displays **all the events in your imported Google Calendar**, as
+requested. You do **not** have to mark classes as "Mine" individually. This
+reverses the earlier, incorrect enrollment-verification gate without clearing,
+replacing, or modifying your local SQLite calendar database. Any legacy
+"unverified" flags are ignored.
 
-In **Planner → Review imported classes**, search by subject, teacher, or
-location. Mark your actual classes with **✓ Mine** and irrelevant sections
-with **✕ Not mine**. AARON-1 applies each decision to recurring occurrences
-that share the same original iCalendar UID, while retaining unrelated sections
-and source data. You can review or change the status again later.
+The source of the earlier invented timetable was the conversational AI:
+having a snippet of calendar data in a language model prompt does NOT
+guarantee that it will quote only real appointments. This build fixes personal
+calendar questions with **deterministic database retrieval** instead of
+model-generated schedule text. Questions about classes, teachers, classroom
+locations, named courses, and upcoming events are answered using ONLY
+recorded event titles, dates, times, and notes, or AARON-1 says the details
+aren't present. Imported items are identified as such in the chat. Entries
+that aren't saved cannot be inferred or added to the answer.
 
-If you need to inspect the raw import without claiming those events as your
-schedule, enable **Show unverified imported events on calendar (for review
-only)**. Click one to open the popup and verify or reject it. Unverified school
-events do **not** appear in personal assistant answers even while this preview
-is enabled. Your existing imported data is neither deleted nor reuploaded.
+Examples: `What classes am I taking?`, `What's on my calendar Friday?`,
+`When's my next Chinese class?`, `Who is my Chinese teacher?`, and
+`Where is my Chemistry class?`. Teacher/room answers require literal
+information in the event's saved notes; otherwise AARON-1 says it's missing.
 
-The **Readable Week** view is the new default and allows event cards to grow
-with long titles rather than squeezing names into 15–30-minute time blocks.
-**Hour Grid** remains an optional view. Under the calendar, a 390px
-scrollable **Every title, fully readable** list shows the full labels as
-clickable event buttons, even when the embedded calendar cannot fit a long
-class name. In this personal list, only verified classes and personal events
-are shown by default.
+This is NOT a live connection to Google; it reads only the local data last
+imported to AARON-1. If something is absent, import the current calendar
+again via Connections. Never upload a personal ICS export or database to
+this public GitHub repository.
 
-This fixes the distinction between *imported timetable data* and *your
-enrollment* but it does not independently verify school records; verification
-depends on your selections. The assistant does not have access to an official
-Dalton student roster or Blackbaud account authorization.
+The **Readable Week** calendar view continues to display fully wrapping
+event cards. A scrollable 390px **Every title, fully readable** list is
+available below it; the optional Hour Grid preserves a classic time view.
 
 ## Local calendar questions and scrollable AI chat
 
@@ -137,10 +136,10 @@ Without any AI model, it answers direct questions from actual saved events:
 - `When is my next Chemistry class?` — upcoming class dates and local times
 - `What's my schedule?` — your next seven days
 
-When using the pretrained or fine-tuned local model, its prompt also receives a
-**bounded 14-day calendar snapshot**, including matching assignments and
-limited notes. It is **read-only** and local: no new Google permissions and
-no ability for the model to modify classes or assignments. The verified
+When using the pretrained or fine-tuned local model for **non-calendar**
+conversation, its prompt receives a bounded 14-day read-only snapshot.
+**Personal schedule questions bypass the model entirely**, because a
+generative model can invent even when calendar context is included. The verified
 existing add-task chat command is unchanged. School calendar content remains
 on your Mac and is not committed to the public repository.
 
