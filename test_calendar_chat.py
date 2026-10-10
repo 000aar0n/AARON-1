@@ -60,6 +60,19 @@ class CalendarAssistantTests(unittest.TestCase):
         self.assertIn("for Chemistry Class", reply)
         self.assertIn("Monday, Oct 12", reply)
 
+    def test_whats_my_schedule_today_and_tomorrow_bypasses_memory_parser(self):
+        self.seed()
+        today = datetime(2026, 10, 12, 8, 0)
+        reply, modified = conv.respond("What's my schedule today?", now=today)
+        self.assertFalse(modified)
+        self.assertIn("Chemistry Class", reply)
+        self.assertIn("10:30 AM", reply)
+        future, modified = conv.respond(
+            "What's on my calendar tomorrow?", now=datetime(2026, 10, 11)
+        )
+        self.assertFalse(modified)
+        self.assertIn("Chemistry Class", future)
+
     def test_when_is_my_next_class_returns_real_local_time(self):
         self.seed()
         reply, acted = conv.respond(
