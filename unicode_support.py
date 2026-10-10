@@ -18,3 +18,12 @@ FONT_STACK = (
     "\x27Apple Color Emoji\x27, \x27Segoe UI Emoji\x27, \x27Noto Color Emoji\x27, "
     "\x27Noto Sans Symbols 2\x27, \x27Segoe UI Symbol\x27, \x27Noto Emoji\x27, sans-serif"
 )
+
+UNICODE_SAMPLES = (
+    ("Chinese", "你好，城市交通，地铁，作业，漢字"),
+    ("Japanese and Korean", "日本語と漢字 · 한국어 안녕하세요"),
+    ("Accents and Arabic", "café, naïve, Español, العربية"),
+    ("Math and symbols", "∑ ∫ ∞ √ π λ ≤ ≥ ≠ ± → ↔ △ ∠ ⊥ ∥ °"),
+    ("Punctuation", "‘single’ “double” — – • § № © ™"),
+    ("Emoji", "📅 ✅ 🎹 🧠 ✨ 😀 🌈"),
+)
