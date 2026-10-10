@@ -8,6 +8,7 @@ from __future__ import annotations
 import math
 import sqlite3
 import uuid
+from pathlib import Path
 from datetime import date, datetime, timedelta
 from typing import Optional
 
@@ -150,6 +151,94 @@ def delete_item(item_id):
         db.commit()
     return bool(result.rowcount)
 
+
+
+
+def all_tasks(*, include_completed=True, limit=3000):
+    """Task-only list; includes completed items so users can delete old work."""
+    ensure_schema()
+    clauses = ["item_type='task'"]
+    if not include_completed:
+        clauses.append("completed=0")
+    with connect() as db:
+        rows = db.execute(
+            "SELECT * FROM tasks WHERE " + " AND ".join(clauses) +
+            " ORDER BY completed, due IS NULL, due, due_time, created_at DESC "
+            "LIMIT ?",
+            (min(max(int(limit), 1), 10000),),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def manually_added_task_count():
+    """Count tasks user created in AARON-1, including completed tasks.
+
+    Imported Blackbaud/calendar tasks, Gmail-sourced tasks, and all events are
+    *never* included in this bulk-deletion scope.
+    """
+    ensure_schema()
+    with connect() as db:
+        return int(db.execute(
+            "SELECT COUNT(*) FROM tasks WHERE source='manual' AND item_type='task'"
+        ).fetchone()[0])
+
+
+def clear_manually_added_tasks(*, expected_count):
+    """Back up the SQLite database and clear only user-authored tasks.
+
+    Must be called after a dedicated confirmed UI action, never at startup.
+    expected_count is checked under a write lock to avoid deleting an
+    unexpectedly changed set of tasks from a stale dashboard.
+    Returns (deleted_count, local_backup_path_or_None).
+    """
+    ensure_schema()
+    if isinstance(expected_count, bool) or not isinstance(expected_count, int):
+        raise ValueError("Expected task count must be a nonnegative integer")
+    if expected_count < 0:
+        raise ValueError("Expected task count must be a nonnegative integer")
+    with connect() as db:
+        sql = "source='manual' AND item_type='task'"
+        count = int(db.execute(
+            "SELECT COUNT(*) FROM tasks WHERE " + sql
+        ).fetchone()[0])
+        if count != expected_count:
+            raise ValueError(
+                "Your task list changed since you opened this confirmation. "
+                "Refresh and review the count before deleting."
+            )
+        if count == 0:
+            return 0, None
+
+        # SQLite's backup API produces a consistent, restorable snapshot,
+        # including memory, Gmail-derived tasks, completed tasks and chat.
+        original = next(row["file"] for row in db.execute("PRAGMA database_list")
+                        if row["name"] == "main")
+        backup_dir = Path(original).resolve().parent / "backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        filename = (
+            "aaron_personal-before-manual-task-clear-" +
+            datetime.now().strftime("%Y%m%d-%H%M%S") + "-" +
+            uuid.uuid4().hex[:8] + ".sqlite3"
+        )
+        backup_path = backup_dir / filename
+        with sqlite3.connect(backup_path) as backup_db:
+            db.backup(backup_db)
+
+        # Serialize the final check and DELETE in one local transaction.
+        db.execute("BEGIN IMMEDIATE")
+        rechecked = int(db.execute(
+            "SELECT COUNT(*) FROM tasks WHERE " + sql
+        ).fetchone()[0])
+        if rechecked != expected_count:
+            db.rollback()
+            raise ValueError(
+                "Your task list changed during deletion. No tasks were removed."
+            )
+        deleted = db.execute(
+            "DELETE FROM tasks WHERE " + sql
+        ).rowcount
+        db.commit()
+    return deleted, str(backup_path)
 
 
 def set_priority(item_id, level):
