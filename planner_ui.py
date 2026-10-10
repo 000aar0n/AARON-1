@@ -64,6 +64,22 @@ CALENDAR_CSS = """
 .fc .fc-daygrid-more-link {color:#bfbaff;font-size:11px}
 .fc .fc-highlight {background:#9386ff33}
 .fc .fc-view-harness{border:1px solid #30394c;border-radius:13px;overflow:hidden}
+/* The calendar now owns the FULL page width, with no editor sidebar. */
+.fc .fc-daygrid-day-frame{min-height:125px}
+.fc .fc-daygrid-event-harness{margin:2px 2px 3px}
+.fc .fc-daygrid-event,.fc .fc-timegrid-event,.fc .fc-list-event{
+  cursor:pointer}
+.fc .fc-event-title,.fc .fc-list-event-title{
+  font-size:13px!important;font-weight:780!important;
+  line-height:1.45!important;overflow-wrap:break-word!important}
+.fc .fc-daygrid-event .fc-event-title{display:block!important;
+  white-space:normal!important;text-overflow:clip!important}
+.fc .fc-timegrid-event .fc-event-main{padding:2px 4px!important}
+.fc .fc-timegrid-event .fc-event-title{max-height:none!important}
+.fc .fc-daygrid-more-link{font-size:13px!important;
+  padding:4px!important;color:#d8d2ff!important}
+.fc .fc-col-header-cell-cushion{font-size:12px!important}
+.fc .fc-timegrid-axis,.fc .fc-timegrid-slot-label{min-width:58px}
 @media(max-width:850px){.fc .fc-toolbar-title{font-size:1.04rem}
  .fc .fc-button{font-size:.75rem;padding:.4em .55em}}
 """
@@ -134,6 +150,12 @@ def _render_editor(*, scope):
     prefix = f"{scope}_planner_{nonce}"
     name = "Edit entry" if existing else "Create an entry"
     st.markdown("#### " + name)
+    if scope == "calendar" and existing:
+        st.markdown("### " + html.escape(existing["title"]))
+        st.caption(
+            ("📅 Event · " if (existing.get("item_type") or "task") == "event"
+             else "✅ Assignment · ") + _format_deadline(existing)
+        )
     if existing and existing.get("repeat_weekly"):
         st.info("↻ This is a weekly series. Changes here update every occurrence "
                 "in the series, not just the date you clicked.")
@@ -280,6 +302,8 @@ def _render_editor(*, scope):
                 st.session_state["planner_editor_id"] = new_id
                 st.toast("Added to your calendar")
             st.session_state["planner_editor_nonce"] = nonce + 1
+            if scope == "calendar":
+                _dismiss_calendar_popup()
             st.rerun()
         except ValueError as exc:
             st.error(str(exc))
@@ -322,6 +346,8 @@ def _render_editor(*, scope):
                 st.rerun()
         if b2.button("Close editor", key=f"{prefix}_close", use_container_width=True):
             _new_item(day=st.session_state.get("planner_new_date", date.today()))
+            if scope == "calendar":
+                _dismiss_calendar_popup()
             st.rerun()
         with st.expander("Delete this entry"):
             st.caption("This permanently deletes the local copy. Imported source "
@@ -332,6 +358,8 @@ def _render_editor(*, scope):
             ):
                 delete_item(existing["id"])
                 _new_item()
+                if scope == "calendar":
+                    _dismiss_calendar_popup()
                 st.toast("Entry deleted")
                 st.rerun()
 
@@ -365,16 +393,41 @@ def _action_list(limit=5, *, scope):
             if c3.button("Edit", key=f"{scope}_rec_edit_{task['id']}",
                          use_container_width=True):
                 _choose_item(task["id"])
+                if scope == "calendar":
+                    st.session_state["planner_popup_open"] = True
                 st.rerun()
+
+
+def _dismiss_calendar_popup():
+    """Called when the modal is dismissed, saved, or explicitly closed."""
+    st.session_state["planner_popup_open"] = False
+
+
+def _open_calendar_popup(*, item_id=None, day=None, at_time=None, kind="task"):
+    """Set the selected record; only the calendar tab shows a modal."""
+    if item_id is not None:
+        _choose_item(item_id)
+    else:
+        _new_item(day=day, at_time=at_time, kind=kind)
+    st.session_state["planner_popup_open"] = True
+
+
+@st.dialog("Calendar details", width="large", on_dismiss=_dismiss_calendar_popup)
+def _calendar_editor_dialog():
+    """Create/edit in a roomy modal so events retain the full page width."""
+    _render_editor(scope="calendar")
+    if st.button("Cancel / Close", key="calendar_dialog_cancel", use_container_width=True):
+        _dismiss_calendar_popup()
+        st.rerun()
 
 
 def calendar_page():
     from ui_theme import page_heading, metric
     page_heading(
         "Time & priorities", "Your planner",
-        "Timed events, assignment deadlines, and a clear next step — in one place.",
+        "Your classes, assignments and workouts — full-size. Click anything to "
+        "open a popup; the calendar stays wide.",
     )
-    actions = next_actions(10)
     today = date.today()
     upcoming = upcoming_workout(today)
     if upcoming:
@@ -382,18 +435,18 @@ def calendar_page():
         if workout_day == today:
             st.info(
                 f"🏋️ **Winter Arc reminder · Today: {kind}** "
-                "— Open today's event for the full exercise list and reps."
+                "— Click today's event to view your workout and reps."
             )
         else:
             st.caption(
                 f"🏋️ Next Winter Arc session: {workout_day.strftime('%a, %b %d')} "
                 f"· {kind}. The plan ends December 30, 2026."
             )
-    today_items = daily_items(today)
-    all_open = open_tasks()
-    # Every legend color comes from the trusted built-in palette.
+
+    # These are CLASSES imported from Google, not a generic "Google" category.
+    # The legend describes the meaning the user gave the colors.
     keys = [
-        ("Google", "Blue"), ("Winter Arc", "Green"), ("Events", "Teal"),
+        ("Classes", "Blue"), ("Winter Arc", "Green"), ("Other events", "Teal"),
         ("Homework", "Purple"), ("High priority", "Orange"),
         ("Urgent", "Red"),
     ]
@@ -407,132 +460,151 @@ def calendar_page():
         for label, color in keys
     )
     st.markdown(legend, unsafe_allow_html=True)
-    st.caption("Click any event or assignment to choose its own color.")
-    a, b, c = st.columns(3)
-    with a:
-        metric("Open tasks", len(all_open), "Across your schedule")
-    with b:
-        metric("On today's calendar", len(today_items), "Events and deadlines")
-    with c:
-        metric("Next move", "Ready" if actions else "All clear",
-               actions[0]["title"][:32] if actions else "No tasks waiting")
 
-    left, right = st.columns([3.65, 1.35], gap="large")
-    with left:
-        # Recurrence expands into occurrences only for this supported display span.
-        range_start = today - timedelta(days=365)
-        range_end = today + timedelta(days=730)
-        all_events = calendar_events(
-            items_for_calendar(start=range_start, end=range_end),
-            start=range_start, end=range_end,
-        )
-        options = {
-            "initialView": "timeGridWeek",
-            "headerToolbar": {
-                "left": "today prev,next", "center": "title",
-                "right": "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
+    new_task, new_event, hint = st.columns([1.1, 1.1, 4], gap="small")
+    if new_task.button(
+        "+ New task", use_container_width=True, type="primary",
+        key="planner_new_task",
+    ):
+        _open_calendar_popup(kind="task")
+    if new_event.button(
+        "+ New event", use_container_width=True, key="planner_new_event"
+    ):
+        _open_calendar_popup(kind="event")
+    hint.caption(
+        "Click a class to see its FULL title and attached assignments, "
+        "or click/drag an empty slot to create something."
+    )
+
+    # Full-width calendar. Weekly occurrences are expanded only for the
+    # supported nearby range; the single canonical event remains editable.
+    range_start = today - timedelta(days=365)
+    range_end = today + timedelta(days=730)
+    all_events = calendar_events(
+        items_for_calendar(start=range_start, end=range_end),
+        start=range_start, end=range_end,
+    )
+    options = {
+        "initialView": "timeGridWeek",
+        "headerToolbar": {
+            "left": "today prev,next",
+            "center": "title",
+            "right": "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
+        },
+        "views": {
+            "dayGridMonth": {
+                "dayMaxEventRows": 5,
+                "fixedWeekCount": False,
             },
-            "views": {
-                "dayGridMonth": {"dayMaxEventRows": 3},
-                "timeGridWeek": {"slotMinTime": "06:00:00"},
+            "timeGridWeek": {
+                "slotMinTime": "06:00:00",
+                "slotMaxTime": "23:00:00",
             },
-            "firstDay": 1,
-            "height": 760,
-            "nowIndicator": True,
-            "weekNumbers": False,
-            "editable": False,
-            "selectable": True,
-            "selectMirror": True,
-            "navLinks": True,
-            "eventTimeFormat": {"hour": "numeric", "minute": "2-digit", "meridiem": "short"},
-            "slotMinTime": "06:00:00",
-            "slotMaxTime": "23:00:00",
-            "slotDuration": "00:30:00",
-            "scrollTime": "08:00:00",
-            "allDaySlot": True,
-            "dayMaxEvents": 3,
-            "eventDisplay": "block",
-            "buttonText": {"today": "Today", "month": "Month",
-                           "week": "Week", "day": "Day", "list": "Agenda"},
-        }
-        result = calendar(
-            events=all_events,
-            options=options,
-            custom_css=CALENDAR_CSS,
-            callbacks=["dateClick", "eventClick", "select"],
-            key="aaron_planner_calendar_v2",
-        )
-        if isinstance(result, dict):
-            callback = result.get("callback")
-            if callback == "eventClick":
-                clicked = result.get("eventClick") or {}
-                event = clicked.get("event") or {}
-                item_id = str(event.get("id") or "")
-                series_id = item_id.split("::", 1)[0]
-                if series_id and get_item(series_id):
-                    if st.session_state.get("planner_editor_id") != series_id:
-                        _choose_item(item_id)
-            elif callback in ("dateClick", "select"):
-                details = result.get(callback) or {}
-                raw = details.get("date") or details.get("start")
-                if raw:
-                    clicked_day = _safe_day(raw)
-                    clock = None if details.get("allDay", True) else _safe_clock(str(raw)[11:16])
-                    signature = (callback, str(raw))
-                    if st.session_state.get("planner_last_click") != signature:
-                        st.session_state["planner_last_click"] = signature
-                        _new_item(day=clicked_day, at_time=clock)
-        st.caption("Click a date to create an item; click an event to edit it. "
-                   "Weekly events share one editable series. Assignment links "
-                   "appear in the event editor. Use Month / Week / Day / Agenda.")
-        st.markdown("#### Your next moves")
+        },
+        "firstDay": 1,
+        "height": 980,
+        "expandRows": True,
+        "nowIndicator": True,
+        "editable": False,
+        "selectable": True,
+        "selectMirror": True,
+        "navLinks": True,
+        "slotEventOverlap": False,
+        "eventMinHeight": 34,
+        "eventShortHeight": 42,
+        "eventTimeFormat": {
+            "hour": "numeric", "minute": "2-digit", "meridiem": "short"
+        },
+        "slotMinTime": "06:00:00",
+        "slotMaxTime": "23:00:00",
+        "slotDuration": "00:30:00",
+        "scrollTime": "08:00:00",
+        "allDaySlot": True,
+        "dayMaxEvents": 5,
+        "moreLinkClick": "popover",
+        "eventDisplay": "block",
+        "buttonText": {
+            "today": "Today", "month": "Month", "week": "Week",
+            "day": "Day", "list": "Agenda"
+        },
+    }
+    result = calendar(
+        events=all_events,
+        options=options,
+        custom_css=CALENDAR_CSS,
+        callbacks=["dateClick", "eventClick", "select"],
+        key="aaron_planner_calendar_v2",
+    )
+    if isinstance(result, dict):
+        callback = result.get("callback")
+        if callback == "eventClick":
+            clicked = result.get("eventClick") or {}
+            event = clicked.get("event") or {}
+            item_id = str(event.get("id") or "")
+            parent_id = item_id.split("::", 1)[0]
+            signature = ("eventClick", item_id)
+            if parent_id and get_item(parent_id):
+                if st.session_state.get("planner_last_click") != signature:
+                    st.session_state["planner_last_click"] = signature
+                    _open_calendar_popup(item_id=item_id)
+        elif callback in ("dateClick", "select"):
+            details = result.get(callback) or {}
+            raw = details.get("date") or details.get("start")
+            if raw:
+                signature = (callback, str(raw))
+                if st.session_state.get("planner_last_click") != signature:
+                    st.session_state["planner_last_click"] = signature
+                    clock = (
+                        None if details.get("allDay", True)
+                        else _safe_clock(str(raw)[11:16])
+                    )
+                    _open_calendar_popup(
+                        day=_safe_day(raw), at_time=clock, kind="event",
+                    )
+        else:
+            # Allows clicking the same event again after another interaction.
+            st.session_state.pop("planner_last_click", None)
+
+    st.caption(
+        "Bigger calendar · click an event to read/edit in a popup · click or "
+        "drag an empty time slot to add one · use Month, Week, Day, or Agenda. "
+        "Long titles also appear in full when opened."
+    )
+
+    # Keep the planner itself uncluttered; supporting panels sit BELOW it.
+    with st.expander("🎯 Your next moves", expanded=False):
+        actions = next_actions(10)
+        all_open = open_tasks()
+        today_items = daily_items(today)
+        a, b, c = st.columns(3)
+        with a:
+            metric("Open tasks", len(all_open), "Across your schedule")
+        with b:
+            metric("On today's calendar", len(today_items), "Events and deadlines")
+        with c:
+            metric(
+                "Next move", "Ready" if actions else "All clear",
+                actions[0]["title"][:55] if actions else "No tasks waiting",
+            )
         _action_list(limit=4, scope="calendar")
 
-    with right:
-        st.markdown("#### 🎯 What to do now")
-        if actions:
-            top = actions[0]
-            with st.container(border=True, key="next_task_spotlight"):
-                st.markdown("**" + html.escape(top["title"]) + "**")
-                st.caption(_format_deadline(top) + " · " + top["why"])
-                if top.get("notes"):
-                    st.caption("Notes: " + str(top["notes"])[:160])
-                done, edit = st.columns(2)
-                if done.button("✓ Done", key="spotlight_done",
-                               use_container_width=True):
-                    toggle_complete(top["id"], True)
-                    st.rerun()
-                if edit.button("Edit task", key="spotlight_edit",
-                               use_container_width=True):
-                    _choose_item(top["id"])
-                    st.rerun()
-        else:
-            st.success("Nothing urgent — you're all caught up.")
-        top1, top2 = st.columns(2)
-        if top1.button("+ New task", use_container_width=True, type="primary",
-                       key="planner_new_task"):
-            _new_item(kind="task")
-            st.rerun()
-        if top2.button("+ Event", use_container_width=True, key="planner_new_event"):
-            _new_item(kind="event")
-            st.rerun()
-        with st.container(border=True, key="planner_editor_panel"):
-            _render_editor(scope="calendar")
-        with st.expander("What's on the selected day?"):
-            selected = st.session_state.get("planner_new_date", today)
-            if not isinstance(selected, date):
-                selected = _safe_day(selected)
-            st.write(f"**{selected.strftime('%A, %b %d')}**")
-            on_day = daily_items(selected)
-            if not on_day:
-                st.caption("Nothing scheduled here yet.")
-            for item in on_day:
-                label = _format_deadline(item)
-                label += "  ·  " + item["title"]
-                if st.button(label, key=f"day_entry_{item['id']}"):
-                    _choose_item(item["id"])
-                    st.rerun()
+    with st.expander("📅 What's on the selected day?", expanded=False):
+        selected = st.session_state.get("planner_new_date", today)
+        if not isinstance(selected, date):
+            selected = _safe_day(selected)
+        st.write(f"**{selected.strftime('%A, %b %d')}**")
+        on_day = daily_items(selected)
+        if not on_day:
+            st.caption("Nothing scheduled here yet.")
+        for item in on_day:
+            label = _format_deadline(item) + " · " + item["title"]
+            if st.button(label, key=f"day_entry_{item['id']}"):
+                _open_calendar_popup(item_id=item["id"])
 
+    # Streamlit renders a single modal on this page at a time, not a
+    # permanently visible editor that squeezes the calendar columns.
+    if st.session_state.get("planner_popup_open"):
+        _calendar_editor_dialog()
 
 
 def _task_delete_controls():
