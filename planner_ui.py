@@ -262,15 +262,37 @@ def _render_editor(*, scope):
             key=f"{prefix}_color",
             help="Automatic colors use the source (Google, Winter Arc) or task priority.",
         )
-        date_col, clock_col = st.columns(2)
-        with date_col:
-            selected_date = st.date_input(
-                "Date / due date", value=initial_date, key=f"{prefix}_date"
-            )
-        with clock_col:
+        selected_date = st.date_input(
+            "Date / due date", value=initial_date, key=f"{prefix}_date"
+        )
+        selected_end_time = None
+        if category == "Event":
+            start_col, end_col = st.columns(2)
+            with start_col:
+                selected_time = st.time_input(
+                    "Start time", value=initial_time, step=300,
+                    disabled=all_day, key=f"{prefix}_start_time"
+                )
+            existing_end = None
+            if existing and existing.get("event_end"):
+                try:
+                    existing_end = datetime.fromisoformat(existing["event_end"]).time()
+                except (ValueError, TypeError):
+                    pass
+            default_end = existing_end or (
+                datetime.combine(initial_date, initial_time)
+                + timedelta(minutes=int(existing.get("duration_min") or 60)
+                            if existing else 60)
+            ).time()
+            with end_col:
+                selected_end_time = st.time_input(
+                    "End time", value=default_end, step=300,
+                    disabled=all_day, key=f"{prefix}_end_time"
+                )
+        else:
             selected_time = st.time_input(
-                "Start / due time", value=initial_time, step=900,
-                disabled=all_day, key=f"{prefix}_time"
+                "Due time", value=initial_time, step=300,
+                disabled=all_day, key=f"{prefix}_due_time"
             )
         repeat_until = None
         if category == "Event":
@@ -282,15 +304,13 @@ def _render_editor(*, scope):
                     ) else initial_date + timedelta(weeks=12),
                     key=f"{prefix}_weekly_until",
                 )
-            duration = st.selectbox(
-                "Length", [15, 30, 45, 60, 90, 120, 180, 240, 480],
-                index=([15, 30, 45, 60, 90, 120, 180, 240, 480].index(
-                    int(existing.get("duration_min") or 60))
-                    if existing and int(existing.get("duration_min") or 60)
-                    in [15, 30, 45, 60, 90, 120, 180, 240, 480] else 3),
-                format_func=lambda n: f"{n // 60} hr {n % 60} min" if n >= 60 else f"{n} min",
-                key=f"{prefix}_duration",
-                disabled=all_day,
+            # Persist the difference so existing calendar rendering, recurring
+            # events and database schema continue to work unchanged.
+            duration = (
+                int((datetime.combine(selected_date, selected_end_time)
+                     - datetime.combine(selected_date, selected_time)
+                    ).total_seconds() // 60)
+                if not all_day else 60
             )
             estimate = 30
             priority = 2
@@ -341,6 +361,9 @@ def _render_editor(*, scope):
             key=f"{prefix}_save",
         )
     if submitted:
+        if category == "Event" and not all_day and not 5 <= duration <= 1440:
+            st.error("End time must be at least 5 minutes after start time on the same day.")
+            return
         details = dict(
             title=title, description=description,
             due=selected_date.isoformat(),
