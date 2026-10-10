@@ -690,6 +690,12 @@ def calendar_page():
             # Allows clicking the same event again after another interaction.
             st.session_state.pop("planner_last_click", None)
 
+    selected_for_edit = st.session_state.get("planner_highlight_id")
+    if selected_for_edit and get_item(str(selected_for_edit).split("::", 1)[0]):
+        if st.button("Edit selected event / task", key="planner_edit_selected"):
+            _open_calendar_popup(item_id=selected_for_edit)
+            st.rerun()
+
     st.caption(
         "One weekly timetable: classes line up with the exact clock time on "
         "the left; all tasks are in the top TASKS row. Tasks with a due time "
