@@ -19,14 +19,12 @@ grep -n '_render_editor(scope=' planner_ui.py
 .venv312/bin/python -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501
 ```
 
-**The crucial check** is that `grep` prints both
-`_render_editor(scope="calendar")` and
-`_render_editor(scope="priorities")`. If it prints nothing, or Git reports a
-merge/checkout error, the local files are still stale; don't delete or reset
-your work. Resolve the Git error before launching the app. In the running UI,
-look for **`AARON-1 build 2026.10.10-task-cleanup-v3`** near the top. Old
-Streamlit processes can keep port 8501 open; stop all old AARON-1 terminals
-before restarting, and reload the browser.
+**The crucial check** is that `grep` finds the Planner popup and
+Priorities editors. If Git reports a merge/checkout error, the local files
+are stale; don't delete or reset your work. Resolve the Git error before
+launching the app. In the running UI, look for
+**`AARON-1 build 2026.10.10-calendar-chat-v7`** near the top.
+Stop any old Streamlit terminals before restarting, and reload the browser.
 
 ### Delete one task or clear all tasks you entered
 
@@ -95,6 +93,33 @@ edit or delete a workout and the app won't re-add it on later reruns. Planner
 also shows today's workout or the next workout as a reminder when you open
 the app. AARON-1 itself doesn't issue push alerts when closed; use scheduled
 phone/ChatGPT notifications for that.
+
+## Local calendar questions and scrollable AI chat
+
+AARON-1 can now **read your local calendar and class schedule** in Chat.
+Without any AI model, it answers direct questions from actual saved events:
+
+- `What's on my calendar next week?` — classes, homework, and other events,
+  including weekly repeating occurrences
+- `When is my next Chemistry class?` — upcoming class dates and local times
+- `What's my schedule?` — your next seven days
+
+When using the pretrained or fine-tuned local model, its prompt also receives a
+**bounded 14-day calendar snapshot**, including matching assignments and
+limited notes. It is **read-only** and local: no new Google permissions and
+no ability for the model to modify classes or assignments. The verified
+existing add-task chat command is unchanged. School calendar content remains
+on your Mac and is not committed to the public repository.
+
+Chat messages now appear in a **550px-tall scrollable history window** above
+the input. You can scroll older conversations while keeping the message
+composer on screen. The application stores the complete chat history in its
+local SQLite database; the interface displays the most recent 60 messages at
+once to stay responsive.
+
+The calendar also provides strong **hover, keyboard-focus and persistent
+clicked-event highlighting**, including a gold outline that remains after
+closing the event's popup so it's obvious which class you last selected.
 
 ## Full-width calendar and pop-up editor
 
