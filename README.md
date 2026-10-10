@@ -4,6 +4,23 @@
 
 This version has replaced the sender/receiver, evolution, and sandbox-network experiments. Old experiment source files were removed. Files and checkpoints already saved on your computer under `data/` were **not deleted**; previously taught personal facts are migrated into the new task database.
 
+## No Ollama needed: talk to pretrained AARON-1
+
+You **do not need Ollama**. AARON-1 can now run the Qwen2.5 0.5B-Instruct language model directly with PyTorch/Transformers, even **before you have any fine-tuning examples**. This model already understands basic language; it won't initially have a personality tailored to you. Fine-tune it later from the **Train AARON-1** tab.
+
+```bash
+cd ~/AARON-1
+git pull
+source .venv/bin/activate
+python3 -m pip install --upgrade -r requirements.txt
+python3 -m pip install -r requirements-training.txt
+python3 -m streamlit run app.py
+```
+
+Go to **Chat → Conversation settings** and choose **AARON-1 (pretrained · no Ollama)**. The **first actual chat** downloads the pretrained Qwen weights from Hugging Face and caches them on your computer (internet required for the first download); later chats run locally, without the Ollama server or API keys. When you've approved enough training examples and finished a LoRA run, activate your adapter and select **AARON-1 (fine-tuned)**.
+
+The model is modest (0.5 billion parameters), so don't expect ChatGPT-level reasoning. On an M4 Mac with 16 GB RAM it's a sensible starting point, although real-world speed and compatibility still require a local test. AARON-1 keeps calendar data and private memory in its SQLite database, and neither mode automatically sends your data to model providers for inference.
+
 ## What can it actually do?
 
 - **🗓️ Planner:** an interactive FullCalendar view with **Month / Week / Day / Agenda**, clickable timed events and task deadlines, descriptions, due times, event lengths, and a quick editor. No Google Calendar account/sync is required; this is the local AARON-1 calendar, styled and operated like Google Calendar.
@@ -94,7 +111,7 @@ The **Priorities** page and **Your next moves** below the calendar rank unfinish
 
 ## Conversational AARON-1 (optional, local only)
 
-In **Chat → Conversation settings**, you can pick from installed local [Ollama](https://ollama.com/) models. This makes AARON-1 much better at actual back-and-forth dialogue and discussing the assignments it knows about. The language model receives recent conversation and a small digest of your local task priorities, through `127.0.0.1` only. It has **no Gmail or task-mutating tools**. All actual calendar updates are processed by AARON-1's verified planner code; arbitrary LLM text cannot silently write to your calendar.
+In **Chat → Conversation settings**, you can choose the native pretrained Qwen model (no Ollama), a trained adapter, or an optional local [Ollama](https://ollama.com/) model. This makes AARON-1 much better at actual back-and-forth dialogue and discussing the assignments it knows about. The language model receives recent conversation and a small digest of your local task priorities, through `127.0.0.1` only. It has **no Gmail or task-mutating tools**. All actual calendar updates are processed by AARON-1's verified planner code; arbitrary LLM text cannot silently write to your calendar.
 
 1. Install [Ollama](https://ollama.com/download) for macOS or Windows and start it.
 2. In a Terminal, run `ollama pull qwen2.5:3b` to download a modest open-weight conversational model.
