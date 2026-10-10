@@ -23,7 +23,7 @@ grep -n '_render_editor(scope=' planner_ui.py
 Priorities editors. If Git reports a merge/checkout error, the local files
 are stale; don't delete or reset your work. Resolve the Git error before
 launching the app. In the running UI, look for
-**`AARON-1 build 2026.10.10-calendar-chat-v7`** near the top.
+**`AARON-1 build 2026.10.10-verified-classes-v8`** near the top.
 Stop any old Streamlit terminals before restarting, and reload the browser.
 
 ### Delete one task or clear all tasks you entered
@@ -94,6 +94,39 @@ also shows today's workout or the next workout as a reminder when you open
 the app. AARON-1 itself doesn't issue push alerts when closed; use scheduled
 phone/ChatGPT notifications for that.
 
+## Important: Imported school calendars are NOT your verified class roster
+
+Some school calendar exports contain **other students' classes**. Simply
+appearing in an ICS or Google Calendar export never means you're enrolled.
+AARON-1 now **hides imported Google entries by default** in its personal
+calendar and excludes them from all chatbot schedule answers and local
+language-model context until you confirm they are yours.
+
+In **Planner → Review imported classes**, search by subject, teacher, or
+location. Mark your actual classes with **✓ Mine** and irrelevant sections
+with **✕ Not mine**. AARON-1 applies each decision to recurring occurrences
+that share the same original iCalendar UID, while retaining unrelated sections
+and source data. You can review or change the status again later.
+
+If you need to inspect the raw import without claiming those events as your
+schedule, enable **Show unverified imported events on calendar (for review
+only)**. Click one to open the popup and verify or reject it. Unverified school
+events do **not** appear in personal assistant answers even while this preview
+is enabled. Your existing imported data is neither deleted nor reuploaded.
+
+The **Readable Week** view is the new default and allows event cards to grow
+with long titles rather than squeezing names into 15–30-minute time blocks.
+**Hour Grid** remains an optional view. Under the calendar, a 390px
+scrollable **Every title, fully readable** list shows the full labels as
+clickable event buttons, even when the embedded calendar cannot fit a long
+class name. In this personal list, only verified classes and personal events
+are shown by default.
+
+This fixes the distinction between *imported timetable data* and *your
+enrollment* but it does not independently verify school records; verification
+depends on your selections. The assistant does not have access to an official
+Dalton student roster or Blackbaud account authorization.
+
 ## Local calendar questions and scrollable AI chat
 
 AARON-1 can now **read your local calendar and class schedule** in Chat.
@@ -124,8 +157,9 @@ closing the event's popup so it's obvious which class you last selected.
 ## Full-width calendar and pop-up editor
 
 The **Planner** calendar now uses the full available width instead of sharing
-the screen with an always-visible event editor. It is taller (980 px), with
-clearer, multi-line event titles and non-overlapping time-grid event boxes.
+the screen with an always-visible event editor. It uses an auto-height **Readable Week** layout, with clearer multi-line
+event titles and non-overlapping cards. The optional Hour Grid still displays
+timed appointments.
 Blue means **Classes** in the legend (your school calendar imported from
 Google), green is Winter Arc, and other colors indicate events and homework.
 
