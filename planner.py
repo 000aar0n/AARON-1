@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import math
 import sqlite3
+from contextlib import closing
 import uuid
 from pathlib import Path
 from datetime import date, datetime, timedelta
@@ -415,7 +416,9 @@ def clear_manually_added_tasks(*, expected_count):
             uuid.uuid4().hex[:8] + ".sqlite3"
         )
         backup_path = backup_dir / filename
-        with sqlite3.connect(backup_path) as backup_db:
+        # Python's sqlite3 connection context manager doesn't close its
+        # handle. Explicit closing prevents locked backups on Windows.
+        with closing(sqlite3.connect(backup_path)) as backup_db:
             db.backup(backup_db)
 
         # Serialize the final check and DELETE in one local transaction.
