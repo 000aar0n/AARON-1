@@ -28,6 +28,7 @@ def ensure_schema():
             "estimated_min": "INTEGER NOT NULL DEFAULT 30",
             "priority_level": "INTEGER NOT NULL DEFAULT 2",
             "item_type": "TEXT NOT NULL DEFAULT 'task'",
+            "event_end": "TEXT",
         }
         for name, decl in upgrades.items():
             if name not in existing:
@@ -134,7 +135,7 @@ def update_item(item_id, *, title, due=None, due_time=None, description="",
     with connect() as db:
         result = db.execute(
             """UPDATE tasks SET title=?,due=?,due_time=?,notes=?,item_type=?,
-              priority_level=?,duration_min=?,estimated_min=? WHERE id=?""",
+              priority_level=?,duration_min=?,estimated_min=?,event_end=NULL WHERE id=?""",
             (fields["title"], fields["due"], fields["due_time"], fields["notes"],
              fields["item_type"], fields["priority_level"], fields["duration_min"],
              fields["estimated_min"], item_id),
@@ -411,7 +412,10 @@ def calendar_events(items):
                 "priority": level, "completed": is_done,
             },
         }
-        if hm:
+        if item.get("event_end") and kind == "event":
+            # Google Calendar uses exact end times; all-day end dates are exclusive.
+            record["end"] = item["event_end"]
+        elif hm:
             # A task is a deadline marker, not a one-hour meeting block.
             minutes = (int(item.get("duration_min") or 60)
                        if kind == "event" else 15)
