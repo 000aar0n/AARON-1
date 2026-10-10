@@ -1,7 +1,4 @@
-"""AARON-1 — one assistant, one dashboard.
-
-No LLM, agent network, mock multi-agent population, or access without permission.
-"""
+"""AARON-1 — one local assistant, planner, and optional trainable language model."""
 from __future__ import annotations
 
 import html
@@ -25,6 +22,8 @@ from assistant_conversation import respond, local_models
 from training_ui import training_page
 from training_data import trained_model
 from trained_chat import inference_dependencies_ready
+
+APP_BUILD = "2026.10.10-task-cleanup-v3"
 
 st.set_page_config(page_title="AARON-1", page_icon="🤖", layout="wide")
 
@@ -320,6 +319,7 @@ def main():
 
     install_theme()
     header()
+    st.caption("AARON-1 build " + APP_BUILD + " · Safe task management update")
 
     # Google returns to this same local dashboard after the user approves OAuth.
     if "code" in st.query_params or "error" in st.query_params:
