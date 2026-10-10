@@ -202,6 +202,21 @@ def render_connections():
                 f"Selected: {google_file.name} "
                 f"({google_file.size / 1024 / 1024:.1f} MB compressed)"
             )
+        recent_google_import = st.session_state.pop(
+            "google_calendar_import_result", None
+        )
+        if recent_google_import is not None:
+            summary = recent_google_import
+            st.success(
+                f"Imported {summary['added']} new events; refreshed "
+                f"{summary['updated']} existing events across "
+                f"{summary['calendars']} calendar(s)."
+            )
+            st.caption(
+                "Covered " + summary["range_start"] + " through " +
+                summary["range_end"] + ". Reimporting refreshes local copies "
+                "without duplicates. This is not live sync."
+            )
         if st.button(
             "Import Google Calendar", key="google_calendar_import",
             type="primary", disabled=google_file is None,
@@ -212,16 +227,10 @@ def render_connections():
                         google_file.getvalue(), google_file.name,
                         from_date=range_from, months=range_months,
                     )
-                st.success(
-                    f"Imported {result['added']} new events; refreshed "
-                    f"{result['updated']} existing events, across "
-                    f"{result['calendars']} calendar(s)."
-                )
-                st.caption(
-                    "Covered " + result["range_start"] + " through " +
-                    result["range_end"] + ". Reimporting updates copies "
-                    "instead of creating duplicates. This is not live sync."
-                )
+                st.session_state["google_calendar_import_result"] = result
+                # Planner is rendered earlier in this same Streamlit run.
+                # Rerun so the newly imported events appear immediately.
+                st.rerun()
             except (ValueError, OSError) as exc:
                 st.error(f"Google Calendar import failed: {exc}")
 
