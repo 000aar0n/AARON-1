@@ -26,9 +26,25 @@ BASE_WEIGHTS = [0.1, 2.3, 1.5, 0.6, 0.7, 0.4, 1.1]
 FEATURES = ("bias", "overdue", "due_today", "due_week", "school", "inbox", "starred")
 
 
+class ClosingConnection(sqlite3.Connection):
+    """Close SQLite handles when leaving with-connect(), on every platform.
+
+    sqlite3.Connection.__exit__ commits/rolls back but does NOT close by
+    default. Windows locks still-open DB files, causing temp DB cleanup
+    failures and preventing reliable backup/moves. This subclass preserves
+    transaction behavior while always closing the handle after the block.
+    """
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            return super().__exit__(exc_type, exc_value, traceback)
+        finally:
+            self.close()
+
+
 def connect():
     DATA.mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(DB, timeout=10)
+    db = sqlite3.connect(DB, timeout=10, factory=ClosingConnection)
     db.row_factory = sqlite3.Row
     db.execute("""CREATE TABLE IF NOT EXISTS tasks (
       id TEXT PRIMARY KEY, title TEXT NOT NULL, due TEXT, notes TEXT,
