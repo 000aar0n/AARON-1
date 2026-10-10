@@ -186,6 +186,20 @@ def is_verified_personal(item):
     return True
 
 
+def imported_series_key(external_id):
+    """Exact calendar-source+UID prefix, regardless of ISO time colons.
+
+    Google importer keys look like source:uid:T:2026-10-12T14:00:00+00:00
+    or source:uid:D:2026-10-12; rsplit(':', 1) would erroneously group by
+    timezone seconds rather than the event UID.
+    """
+    raw = str(external_id or "")
+    for marker in (":T:", ":D:"):
+        if marker in raw:
+            return raw.rsplit(marker, 1)[0]
+    return raw.rsplit(":", 1)[0]
+
+
 def review_imported_groups(*, search="", limit=75):
     """Group incoming Google events by source calendar + iCal UID.
 
@@ -209,7 +223,7 @@ def review_imported_groups(*, search="", limit=75):
         text_value = (item["title"] + " " + (item.get("notes") or "")).casefold()
         if needle and needle not in text_value:
             continue
-        key = (item.get("external_id") or item["id"]).rsplit(":", 1)[0]
+        key = imported_series_key(item.get("external_id") or item["id"])
         group = groups.get(key)
         if group is None:
             groups[key] = {
@@ -258,13 +272,13 @@ def set_imported_personal_status(item_id, status):
         if not identifier:
             ids = [item_id]
         else:
-            series = identifier.rsplit(":", 1)[0]
+            series = imported_series_key(identifier)
             ids = [
                 current["id"] for current in db.execute(
                     "SELECT id, external_id FROM tasks "
                     "WHERE source='google_calendar' AND item_type='event'"
                 ).fetchall()
-                if str(current["external_id"] or "").rsplit(":", 1)[0] == series
+                if imported_series_key(current["external_id"]) == series
             ]
         db.executemany(
             "UPDATE tasks SET personal_status=? WHERE id=?",
