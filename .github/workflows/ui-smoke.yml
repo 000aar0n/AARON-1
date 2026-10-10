@@ -13,7 +13,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Check Python syntax
-        run: python -m compileall -q app.py ui_theme.py planner_ui.py training_ui.py
+        run: python -m compileall -q app.py ui_theme.py planner_ui.py training_ui.py assistant_conversation.py
+      - name: Chinese Unicode and IME regression tests
+        run: python -m unittest discover -s tests -p "test_chinese_support.py"
       - name: Calendar navigation regression tests
         run: python -m unittest discover -s tests -p "test_calendar_navigation.py"
       - name: Verify dedicated pages and no legacy tabs
