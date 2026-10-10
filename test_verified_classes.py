@@ -233,6 +233,26 @@ class GroundedCalendarTests(unittest.TestCase):
             self.assertNotIn("Advanced Engineering", reply)
             model.assert_not_called()
 
+    def test_subjects_and_school_blocks_are_also_database_only(self):
+        self.import_fixture()
+        with patch.object(
+            conv, "_local_model_reply",
+            return_value="Your schedule has Advanced Architecture at 10:05",
+        ) as model:
+            for prompt in (
+                "What subjects do I take?",
+                "What do I have in my first block?",
+                "What is my school day like?",
+            ):
+                response, changed = conv.respond(
+                    prompt, now=datetime(2026, 10, 10),
+                    model="qwen2.5:3b",
+                )
+                self.assertFalse(changed)
+                self.assertNotIn("Advanced Architecture", response)
+                self.assertIn("Chinese Class", response)
+            model.assert_not_called()
+
     def test_unknown_subject_returns_missing_not_model_output(self):
         self.import_fixture()
         output, acted = conv.respond(
