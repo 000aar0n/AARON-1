@@ -18,12 +18,14 @@ from avatar import render_face
 from ui_theme import install_theme, header, page_heading
 from planner_ui import calendar_page, tasks_page
 from planner import ensure_schema
+from google_calendar_import import import_google_calendar
+from winter_arc import seed_winter_arc
 from assistant_conversation import respond, local_models
 from training_ui import training_page
 from training_data import trained_model
 from trained_chat import inference_dependencies_ready
 
-APP_BUILD = "2026.10.10-task-cleanup-v3"
+APP_BUILD = "2026.10.10-calendar-winterarc-v4"
 
 st.set_page_config(page_title="AARON-1", page_icon="🤖", layout="wide")
 
@@ -172,6 +174,58 @@ def render_connections():
                     st.error("Could not start Google authentication. Check OAuth settings.")
 
     with st.container(border=True):
+        st.markdown("#### 📅 Google Calendar — private import")
+        st.caption(
+            "Import your Google Calendar export directly, including the ZIP "
+            "download. Event times, durations, multi-day entries and recurring "
+            "instances are preserved. This makes a local copy only; nothing "
+            "is uploaded to GitHub or changed in Google."
+        )
+        google_file = st.file_uploader(
+            "Google Calendar export (.ics or .zip)",
+            type=["ics", "zip"], key="google_calendar_file",
+        )
+        range_from = st.date_input(
+            "Import events beginning", value=__import__("datetime").date.today()
+            - __import__("datetime").timedelta(days=30),
+            key="google_calendar_from",
+            help="The export contains years of history. Usually the last 30 "
+                 "days onward is enough; choose an earlier date if needed.",
+        )
+        range_months = st.selectbox(
+            "How far ahead?", [6, 12, 18, 24, 36, 48],
+            index=2, format_func=lambda x: f"{x} months",
+            key="google_calendar_months",
+        )
+        if google_file is not None:
+            st.caption(
+                f"Selected: {google_file.name} "
+                f"({google_file.size / 1024 / 1024:.1f} MB compressed)"
+            )
+        if st.button(
+            "Import Google Calendar", key="google_calendar_import",
+            type="primary", disabled=google_file is None,
+        ):
+            try:
+                with st.spinner("Reading and expanding calendar events locally…"):
+                    result = import_google_calendar(
+                        google_file.getvalue(), google_file.name,
+                        from_date=range_from, months=range_months,
+                    )
+                st.success(
+                    f"Imported {result['added']} new events; refreshed "
+                    f"{result['updated']} existing events, across "
+                    f"{result['calendars']} calendar(s)."
+                )
+                st.caption(
+                    "Covered " + result["range_start"] + " through " +
+                    result["range_end"] + ". Reimporting updates copies "
+                    "instead of creating duplicates. This is not live sync."
+                )
+            except (ValueError, OSError) as exc:
+                st.error(f"Google Calendar import failed: {exc}")
+
+    with st.container(border=True):
         st.markdown("#### 📚 School assignments")
         st.caption("For Blackbaud, export an assignment calendar (ICS) or CSV "
                    "if your school makes one available. This does not sign in to Blackbaud.")
@@ -314,6 +368,8 @@ def answer_with_context(message, history):
 def main():
     init_chat()
     ensure_schema()
+    # Only once per local database, honoring the user's Winter Arc schedule.
+    seed_winter_arc()
     from assistant_core import migrate_legacy_facts
     migrate_legacy_facts()
 
