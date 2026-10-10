@@ -178,6 +178,9 @@ def train(job_id):
     )
     print(f"Fine-tuning {len(train_ds)} approved examples; "
           f"{len(eval_ds)} held-out evaluations.", flush=True)
+    baseline = trainer.evaluate()
+    print("Held-out baseline loss:",
+          round(float(baseline.get("eval_loss", float("nan"))), 4), flush=True)
     result = trainer.train()
     metrics = trainer.evaluate()
     adapter_dir = folder / "adapter"
@@ -189,6 +192,7 @@ def train(job_id):
     report = {
         "base_model": base, "device": accelerator,
         "train_loss": float(result.training_loss),
+        "baseline_eval_loss": float(baseline.get("eval_loss", float("nan"))),
         "eval_loss": float(metrics.get("eval_loss", float("nan"))),
         "train_examples": len(train_ds), "eval_examples": len(eval_ds),
         "epochs": int(job["epochs"]),
@@ -196,8 +200,10 @@ def train(job_id):
                 "it is not an intelligence score or guarantee of improvement.",
     }
     # Avoid nonstandard NaN in JSON metadata.
-    if not __import__("math").isfinite(report["eval_loss"]):
-        report["eval_loss"] = None
+    import math
+    for key in ("eval_loss", "baseline_eval_loss", "train_loss"):
+        if not math.isfinite(report[key]):
+            report[key] = None
     atomic_json(folder / "metrics.json", report)
     update_job(job_id, status="completed", metrics=report)
     print("TRAINING COMPLETE. Adapter saved to:", adapter_dir, flush=True)
