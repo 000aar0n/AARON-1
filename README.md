@@ -4,6 +4,59 @@
 
 This version has replaced the sender/receiver, evolution, and sandbox-network experiments. Old experiment source files were removed. Files and checkpoints already saved on your computer under `data/` were **not deleted**; previously taught personal facts are migrated into the new task database.
 
+## Run this version on your school Mac (no admin / Homebrew)
+
+If you already created `.venv312` using `uv`, **do not reinstall anything**.
+After stopping the old Streamlit process with `Control+C`, update to the
+current `main` branch and start the Python 3.12 environment:
+
+```bash
+cd ~/AARON-1
+git status --short --branch
+git pull --ff-only origin main
+grep -n '_render_editor(scope=' planner_ui.py
+.venv312/bin/python --version
+.venv312/bin/python -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501
+```
+
+**The crucial check** is that `grep` prints both
+`_render_editor(scope="calendar")` and
+`_render_editor(scope="priorities")`. If it prints nothing, or Git reports a
+merge/checkout error, the local files are still stale; don't delete or reset
+your work. Resolve the Git error before launching the app. In the running UI,
+look for **`AARON-1 build 2026.10.10-task-cleanup-v3`** near the top. Old
+Streamlit processes can keep port 8501 open; stop all old AARON-1 terminals
+before restarting, and reload the browser.
+
+### Delete one task or clear all tasks you entered
+
+- **Priorities → All tasks · including completed → Delete → Yes, delete task**
+  deletes any local task you choose. Deleting an imported copy never changes
+  the original Blackbaud assignment or email.
+- **Priorities → Clear all tasks I added** shows how many manually entered
+  tasks (including completed tasks) would be removed. Check the confirmation
+  box and click the delete button to clear them. It creates a full SQLite
+  backup in `data/backups/` before deletion.
+- **Events, imported school/calendar/email tasks, memories, training data,
+  and chat history are excluded** from that bulk clear. You can remove any
+  imported task individually if you want.
+
+Alternatively, from Terminal, preview the cleanup without changing anything:
+
+```bash
+cd ~/AARON-1
+.venv312/bin/python clear_my_tasks.py
+```
+
+Then run the explicitly confirmed one-time operation:
+
+```bash
+.venv312/bin/python clear_my_tasks.py --yes
+```
+
+This command runs only on your computer; GitHub and ChatGPT cannot see or
+directly wipe your local task database. It prints the location of the backup.
+
 ## No Ollama needed: talk to pretrained AARON-1
 
 You **do not need Ollama**. AARON-1 can now run the Qwen2.5 0.5B-Instruct language model directly with PyTorch/Transformers, even **before you have any fine-tuning examples**. This model already understands basic language; it won't initially have a personality tailored to you. Fine-tune it later from the **Train AARON-1** tab.
@@ -30,7 +83,7 @@ The model is modest (0.5 billion parameters), so don't expect ChatGPT-level reas
 - **✅ Task controls:** add, edit, prioritize, finish and reopen tasks. New entries can have descriptions, dates, clock times and effort estimates. The **Important** action also teaches the local priority model.
 - **🔗 Connect:** import school assignments from an .ics calendar export or .csv file. Optionally authorize a personal **Gmail** account using Google's own OAuth sign-in, with **read-only** Gmail access. Browse inbox subjects and snippets, search school-related email, and explicitly add a message as a task.
 
-Without Ollama, AARON-1 **does not** have a general-purpose language model: its chat is based on explicit commands and rules. An optional locally running pretrained Ollama model enables more natural conversation but is not AARON-1 training a neural model from scratch. It continues learning priority weights from your feedback. It never sends/deletes emails, logs in to Blackbaud, completes homework, edits files, or acts without approval.
+AARON-1 offers **direct pretrained Qwen chat without Ollama**, optional Ollama, or rule-based chat. It can also load a locally fine-tuned adapter after a deliberate training run. The language model cannot mutate tasks except through verified application commands, and Gmail remains read-only. Personal task-priority feedback is saved locally.
 
 ## Run on your Mac — one Terminal, one browser tab
 
@@ -119,7 +172,7 @@ In **Chat → Conversation settings**, you can choose the native pretrained Qwen
 
 Without Ollama you can still ask `what should I do next?`, `what homework is due`, `what is on my schedule tomorrow`, or say `add task chemistry homework due tomorrow at 5pm`. AARON-1's fallback conversation remains limited; it doesn't pretend otherwise.
 
-**Tests:** `python3 -m unittest -v test_assistant.py test_planner.py`.
+**Tests:** `python3 -m unittest -v test_assistant.py test_planner.py test_training.py test_planner_widgets.py test_task_cleanup.py`.
 
 ## 🧠 Train AARON-1 — actual model fine-tuning
 
