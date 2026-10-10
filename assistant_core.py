@@ -282,6 +282,59 @@ def parse_csv(data, source="blackbaud", max_rows=300):
     return created
 
 
+
+def month_bounds(year, month):
+    """Inclusive first day and exclusive next-month day (supports December)."""
+    first = date(int(year), int(month), 1)
+    next_month = (date(first.year + 1, 1, 1)
+                  if first.month == 12 else date(first.year, first.month + 1, 1))
+    return first, next_month
+
+
+def change_month(first, offset):
+    """Shift calendar navigation by whole months, including across years."""
+    index = first.year * 12 + (first.month - 1) + int(offset)
+    year, month_zero = divmod(index, 12)
+    return date(year, month_zero + 1, 1)
+
+
+def tasks_due_in_month(year, month, include_completed=True):
+    """Get EVERY dated task for a displayed month, without the task-list cap."""
+    first, after = month_bounds(year, month)
+    where = "due >= ? AND due < ?"
+    if not include_completed:
+        where += " AND completed=0"
+    with connect() as db:
+        records = db.execute(
+            f"SELECT * FROM tasks WHERE {where} "
+            "ORDER BY due ASC, completed ASC, title COLLATE NOCASE ASC",
+            (first.isoformat(), after.isoformat()),
+        ).fetchall()
+    return [dict(row) for row in records]
+
+
+def tasks_without_due_date(limit=100):
+    """Open tasks that cannot be plotted on a calendar yet."""
+    with connect() as db:
+        rows = db.execute(
+            "SELECT * FROM tasks WHERE due IS NULL AND completed=0 "
+            "ORDER BY created_at DESC LIMIT ?", (max(1, min(int(limit), 500)),)
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def set_task_due_date(task_id, due):
+    """Reschedule a local task; NEVER updates an external school account."""
+    normalized = validate_date(due)
+    if normalized is None:
+        raise ValueError("Choose a date to put this task on the calendar")
+    with connect() as db:
+        cursor = db.execute(
+            "UPDATE tasks SET due=? WHERE id=?", (normalized, task_id)
+        )
+        db.commit()
+    return cursor.rowcount > 0
+
 def concise_reply(message):
     """Small transparent command parser, without pretending to know English."""
     message = (message or "").strip()
