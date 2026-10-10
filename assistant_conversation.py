@@ -109,6 +109,14 @@ def _read_calendar_question(lower, today):
             "what am i doing", "what's on", "whats on",
         )
     )
+    if any(term in lower for term in ("my teacher", "my teachers",
+                                      "who teaches", "classroom", "my room")):
+        return (
+            "I can't verify which teacher or classroom is yours from a "
+            "school-wide calendar export. Confirm your actual classes in "
+            "Planner → Review imported classes first. I won't invent a "
+            "teacher, classroom, or enrollment."
+        )
     if any(phrase in lower for phrase in (
         "this week", "next week", "coming week", "next seven days",
         "next 7 days",
@@ -179,6 +187,18 @@ def _read_calendar_question(lower, today):
             "A school-wide import is not proof that you're enrolled. "
             "Use Planner → Review imported classes to confirm your own; "
             "I won't invent a class time."
+        )
+    # Answer any other question explicitly about the user's calendar from
+    # verified data, never by allowing the LLM to invent enrolled classes.
+    if asks_about_schedule and (
+        lower.startswith((
+            "what", "when", "where", "which", "who", "show", "tell",
+            "list", "do i", "are my", "is my", "can you check",
+        ))
+    ):
+        return format_schedule(
+            schedule_for_range(today, today + timedelta(days=7)),
+            "the next seven days",
         )
     return None
 
