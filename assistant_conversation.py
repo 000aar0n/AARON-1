@@ -122,8 +122,12 @@ def _is_personal_calendar_query(text):
         r"teachers?|instructors?|homerooms?|who teaches)\b", text
     ))
     classes = bool(re.search(
-        r"\b(?:classes|class|courses?|lessons?|periods?)\b", text
+        r"\b(?:classes|class|courses?|lessons?|subjects?|periods?|blocks?)\b",
+        text,
     ))
+    if re.search(r"\b(?:school day|schoolday|school timetable)\b", text):
+        if personal or question:
+            return True
     if timetable and (personal or question or temporal):
         return True
     if classes and (personal or temporal or re.search(
@@ -386,7 +390,9 @@ def _local_model_reply(message, previous, model):
         raw = str(item.get("message", ""))[:2200]
         if role == "assistant" and re.search(
             r"\b(?:calendar|timetable|schedule|classes|classroom|teachers?|"
-            r"course roster|school period|period \d|enrolled)\b",
+            r"course roster|school period|period \d|enrolled)\b"
+            r"|\b20\d{2}-\d{2}-\d{2}\s+\d{1,2}:\d{2}\s*\|"
+            r"\s*(?:event|task)\s*\|",
             raw, re.IGNORECASE,
         ):
             # Older generated replies may contain invented course names and
