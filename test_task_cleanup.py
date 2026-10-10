@@ -169,10 +169,13 @@ class TaskCleanupTests(unittest.TestCase):
         self.assertEqual(planner.manually_added_task_count(), 0)
         for task in (imported, email, event):
             self.assertIsNotNone(planner.get_item(task))
+        # If new tasks are created later, clearing them needs fresh approval.
+        planner.create_item(title="New task added later", due="2026-10-20")
+        at.run()
         self.assertIn(
             "priorities_confirm_bulk_delete_1",
             [box.key for box in at.checkbox],
-            "The bulk delete confirmation must reset after a successful clear",
+            "The bulk delete confirmation must reset for future tasks",
         )
         self.assertFalse(at.checkbox(key="priorities_confirm_bulk_delete_1").value)
 
