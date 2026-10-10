@@ -188,6 +188,51 @@ class GroundedCalendarTests(unittest.TestCase):
         after = [planner.get_item(uid) for uid in ids]
         self.assertEqual(before, after)
 
+    def test_academic_class_questions_still_use_the_language_model(self):
+        self.import_fixture()
+        with patch.object(
+            conv, "_local_model_reply",
+            return_value="Python classes define reusable objects.",
+        ) as model:
+            reply, modified = conv.respond(
+                "What is a class in Python?",
+                now=datetime(2026, 10, 10),
+                model="test-model",
+            )
+        self.assertFalse(modified)
+        self.assertIn("Python classes", reply)
+        model.assert_called_once()
+
+    def test_add_task_with_class_name_is_not_blocked_by_calendar_lookup(self):
+        self.import_fixture()
+        reply, modified = conv.respond(
+            "add task study for my chemistry class due tomorrow",
+            now=datetime(2026, 10, 10),
+        )
+        self.assertTrue(modified)
+        self.assertIn("Added", reply)
+        created = [task for task in planner.all_tasks()
+                   if task["title"] == "study for my chemistry class"]
+        self.assertEqual(len(created), 1)
+        self.assertEqual(created[0]["due"], "2026-10-11")
+
+    def test_generic_schedule_questions_are_grounded_not_generated(self):
+        self.import_fixture()
+        with patch.object(
+            conv, "_local_model_reply",
+            return_value="You have Advanced Engineering with Mr. Atlas.",
+        ) as model:
+            reply, acted = conv.respond(
+                "What do I have next week?",
+                now=datetime(2026, 10, 10),
+                model="not-loaded",
+            )
+            self.assertFalse(acted)
+            self.assertIn("Chinese Class", reply)
+            self.assertIn("Chemistry Class", reply)
+            self.assertNotIn("Advanced Engineering", reply)
+            model.assert_not_called()
+
     def test_unknown_subject_returns_missing_not_model_output(self):
         self.import_fixture()
         output, acted = conv.respond(
