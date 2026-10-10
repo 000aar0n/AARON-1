@@ -96,6 +96,25 @@ also shows today's workout or the next workout as a reminder when you open
 the app. AARON-1 itself doesn't issue push alerts when closed; use scheduled
 phone/ChatGPT notifications for that.
 
+## Full-width calendar and pop-up editor
+
+The **Planner** calendar now uses the full available width instead of sharing
+the screen with an always-visible event editor. It is taller (980 px), with
+clearer, multi-line event titles and non-overlapping time-grid event boxes.
+Blue means **Classes** in the legend (your school calendar imported from
+Google), green is Winter Arc, and other colors indicate events and homework.
+
+Click a calendar class/event/assignment to open its details in a **large
+popup**, including the full title, notes, and linked assignments. Click an
+empty calendar date or drag across a time range to open a new-event popup.
+The **+ New task** and **+ New event** buttons above the calendar do the same.
+Saving or canceling closes the popup without shrinking the calendar. The
+Priorities page retains its own editor, with distinct Streamlit widget keys.
+
+Use **Month / Week / Day / Agenda** to switch views; the Month view shows more
+event rows before its built-in **+ more** popup. Google imports are still
+read-only and local, and this update does not delete or reset tasks.
+
 ## Calendar color coding, weekly events, and attached assignments
 
 In **Planner**, click an existing calendar item or **+ Event** / **+ New task**.
