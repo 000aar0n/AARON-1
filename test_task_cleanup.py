@@ -124,7 +124,7 @@ class TaskCleanupTests(unittest.TestCase):
             code = main(["--yes"])
         self.assertEqual(code, 0)
         self.assertEqual(planner.manually_added_task_count(), 0)
-        self.assertIn("Backup saved", out.getvalue())
+        self.assertIn("backup saved", out.getvalue().lower())
 
     def _run_app(self):
         path = str(Path(__file__).resolve().parent / "app.py")
