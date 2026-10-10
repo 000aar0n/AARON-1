@@ -1,8 +1,7 @@
-"""Regression tests: school-wide calendar entries are NOT evidence of enrollment.
+"""Regression tests: all personal imported events visible; NO invented classes.
 
-All data is invented in isolated SQLite fixtures. Imported events are visible
-for review, but may never be presented as the user's verified classes until
-the user explicitly marks a matching iCalendar UID as theirs.
+The assistant must get every claimed class/time/teacher/room from SQLite.
+No private user calendar, network, or real school data is used here.
 """
 from __future__ import annotations
 
@@ -21,7 +20,7 @@ import planner
 import planner_ui
 
 
-class VerifiedCalendarTests(unittest.TestCase):
+class GroundedCalendarTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         root = Path(self.temp.name)
@@ -41,148 +40,122 @@ class VerifiedCalendarTests(unittest.TestCase):
         self.temp.cleanup()
 
     def import_fixture(self):
-        """School-wide export with repeated classes for another student."""
+        """Mock the user's own calendar; none of the alleged fake classes exist."""
         rows = [
-            ("g1", "Advanced Architecture: Digital Domains",
-             "school:other-architect:20261016T1005", "2026-10-16",
-             "Location: 1003 Teacher: Atlas"),
-            ("g2", "Advanced Architecture: Digital Domains",
-             "school:other-architect:20261023T1005", "2026-10-23",
-             "Location: 1003 Teacher: Atlas"),
-            ("g3", "High School Math",
-             "school:other-math:20261017T0810", "2026-10-17",
-             "Location: 421 Teacher: Kellam"),
+            ("g1", "Chinese Class", "personal:chinese:20261012T1105",
+             "2026-10-12", "11:05",
+             "Location: 410 Teacher: Mei Lin", "unverified"),
+            ("g2", "Chemistry Class", "personal:chem:20261014T0910",
+             "2026-10-14", "09:10",
+             "Location: 226 Teacher: Dr. Chen", "not_mine"),
+            ("g3", "Chinese Class", "personal:chinese:20261016T1105",
+             "2026-10-16", "11:05",
+             "Location: 410 Teacher: Mei Lin", "mine"),
         ]
         with core.connect() as db:
             db.executemany(
                 """INSERT INTO tasks
                  (id,title,external_id,due,due_time,notes,item_type,
-                  source,created_at)
-                  VALUES (?,?,?,?,?,?,?,?,?)""",
+                  source,created_at,personal_status)
+                  VALUES (?,?,?,?,?,?,?,?,?,?)""",
                 [
-                    (item_id, title, external_id, due, "10:05", notes,
-                     "event", "google_calendar", "2026-10-10T09:00:00")
-                    for item_id, title, external_id, due, notes in rows
-                ]
+                    (uid, title, external_id, due, when, notes,
+                     "event", "google_calendar", "2026-10-10T09:00:00", status)
+                    for uid, title, external_id, due, when, notes, status in rows
+                ],
             )
             db.commit()
         return [r[0] for r in rows]
 
-    def test_existing_school_import_defaults_to_unverified(self):
+    def test_all_imported_events_display_without_any_manual_confirmation(self):
         ids = self.import_fixture()
-        for item_id in ids:
-            entry = planner.get_item(item_id)
-            self.assertEqual(entry["personal_status"], "unverified")
-            self.assertFalse(planner.is_verified_personal(entry))
-        counts = planner.imported_review_counts()
-        self.assertEqual(counts["unverified"], 3)
+        for uid in ids:
+            self.assertTrue(planner.is_verified_personal(planner.get_item(uid)))
+        events = cc.schedule_for_range(date(2026, 10, 12), date(2026, 10, 17))
+        self.assertEqual([x["title"] for x in events], [
+            "Chinese Class", "Chemistry Class", "Chinese Class"
+        ])
 
-    def test_assistant_omits_other_students_imported_events(self):
+    def test_direct_calendar_answer_never_invents_unsaved_classes(self):
         self.import_fixture()
-        reply, action = conv.respond(
-            "What is on my calendar next week?",
-            now=datetime(2026, 10, 10, 9, 0),
-        )
-        self.assertFalse(action)
-        self.assertNotIn("Advanced Architecture", reply)
-        self.assertNotIn("High School Math", reply)
-        self.assertIn("unverified", reply.lower())
-        self.assertIn("won't guess", reply.lower())
+        invented = "Advanced Architecture: Digital Domains"
+        with patch.object(
+            conv, "_local_model_reply",
+            return_value="You have " + invented + " with Teacher: Atlas"
+        ) as model:
+            reply, acted = conv.respond(
+                "Which classes do I have on Friday?",
+                now=datetime(2026, 10, 10, 9),
+                model="qwen2.5:3b",
+                previous=[{
+                    "role": "assistant",
+                    "message": "You have " + invented + " this week."
+                }],
+            )
+            self.assertFalse(acted)
+            self.assertIn("Chinese Class", reply)
+            self.assertNotIn(invented, reply)
+            self.assertNotIn("Teacher: Atlas", reply)
+            model.assert_not_called()
 
-        query, action = conv.respond(
-            "When is my next advanced architecture class?",
-            now=datetime(2026, 10, 10),
-        )
-        self.assertFalse(action)
-        self.assertNotIn("Oct 16", query)
-        self.assertIn("no verified", query)
-
-        classes, action = conv.respond(
-            "What classes am I taking?",
-            now=datetime(2026, 10, 10),
-        )
-        self.assertFalse(action)
-        self.assertNotIn("Advanced Architecture", classes)
-
-    def test_teacher_room_and_general_class_questions_never_hallucinate(self):
+    def test_lookups_never_invent_unknown_course_teacher_or_time(self):
         self.import_fixture()
-        for question in (
-            "Who is my teacher for Advanced Architecture?",
-            "What is my classroom?",
-            "Which classes do I have on Friday?",
-            "Show me my full class timetable",
-        ):
-            reply, modified = conv.respond(
-                question, now=datetime(2026, 10, 10), model="not-installed",
-            )
-            self.assertFalse(modified)
-            self.assertNotIn(
-                "Teacher: Atlas", reply,
-                "The assistant disclosed an unverified teacher for: " + question,
-            )
-            self.assertNotIn(
-                "Advanced Architecture", reply,
-                "The assistant attributed another student's course for: " + question,
-            )
-            self.assertTrue(
-                any(term in reply.lower() for term in (
-                    "verify", "verified", "unverified", "confirm"
-                )),
-                repr(reply),
-            )
+        with patch.object(conv, "_local_model_reply") as model:
+            for question in (
+                "When is my next Advanced Architecture class?",
+                "Who is my Advanced Architecture teacher?",
+                "Where is my Advanced Architecture class?",
+            ):
+                reply, acted = conv.respond(
+                    question, now=datetime(2026, 10, 10),
+                    model="__aaron_base__",
+                )
+                self.assertFalse(acted)
+                self.assertIn("can't find", reply.lower())
+                self.assertNotIn("Teacher: Atlas", reply)
+            model.assert_not_called()
 
-    def test_local_model_context_never_receives_unverified_classes(self):
+    def test_saved_teacher_and_room_are_quoted_verbatim_from_notes(self):
         self.import_fixture()
-        ctx = cc.calendar_model_context(
-            today=date(2026, 10, 10), days=14
-        )
-        self.assertNotIn("Advanced Architecture", ctx)
-        self.assertNotIn("High School Math", ctx)
-        self.assertIn("Only events manually added", ctx)
-
-    def test_confirming_class_updates_repeats_only_not_other_majors(self):
-        ids = self.import_fixture()
-        changed = planner.set_imported_personal_status(ids[0], "mine")
-        self.assertEqual(changed, 2)
-        self.assertEqual(planner.get_item(ids[1])["personal_status"], "mine")
-        self.assertEqual(planner.get_item(ids[2])["personal_status"], "unverified")
-        self.assertEqual(
-            len(cc.schedule_for_range(
-                date(2026, 10, 16), date(2026, 10, 24)
-            )),
-            2,
-        )
-        answer, acted = conv.respond(
-            "What's on my calendar next week?",
-            now=datetime(2026, 10, 10),
+        teacher, acted = conv.respond(
+            "Who is my Chinese teacher?", now=datetime(2026, 10, 10),
         )
         self.assertFalse(acted)
-        self.assertIn("Advanced Architecture", answer)
-        self.assertNotIn("High School Math", answer)
-        self.assertIn("unverified", answer.lower())
+        self.assertIn("Mei Lin", teacher)
+        self.assertIn("saved calendar notes", teacher)
+        room, acted = conv.respond(
+            "Where is my Chemistry class?", now=datetime(2026, 10, 10),
+        )
+        self.assertFalse(acted)
+        self.assertIn("226", room)
+        self.assertNotIn("1003", room)
 
-    def test_rejecting_class_hides_all_repeated_instances(self):
-        ids = self.import_fixture()
-        n = planner.set_imported_personal_status(ids[0], "not_mine")
-        self.assertEqual(n, 2)
-        self.assertFalse(planner.is_verified_personal(planner.get_item(ids[0])))
-        self.assertFalse(planner.is_verified_personal(planner.get_item(ids[1])))
-        self.assertEqual(planner.get_item(ids[2])["personal_status"], "unverified")
-
-    def test_manual_events_remain_trusted_without_import_confirmation(self):
+    def test_class_list_contains_distinct_saved_titles_only(self):
         self.import_fixture()
-        manual = planner.create_item(
-            title="My actual Geometry class", due="2026-10-16",
-            item_type="event", due_time="12:10",
+        roster, acted = conv.respond(
+            "What classes am I taking?", now=datetime(2026, 10, 10),
+            model="qwen2.5:3b",
         )
-        self.assertTrue(planner.is_verified_personal(planner.get_item(manual)))
-        schedule = cc.schedule_for_range(
-            date(2026, 10, 16), date(2026, 10, 17)
-        )
-        self.assertEqual([x["title"] for x in schedule],
-                         ["My actual Geometry class"])
+        self.assertFalse(acted)
+        self.assertEqual(roster.count("**Chinese Class**"), 1)
+        self.assertEqual(roster.count("**Chemistry Class**"), 1)
+        for absent in ("Advanced Architecture", "Advanced Engineering",
+                       "Physical Education", "High School Math"):
+            self.assertNotIn(absent, roster)
+        self.assertIn("exact saved event titles", roster.lower())
 
-    def test_review_ui_does_not_show_unverified_classes_in_default_calendar(self):
+    def test_notes_and_model_snapshot_include_actual_imported_events(self):
+        self.import_fixture()
+        context = cc.calendar_model_context(
+            today=date(2026, 10, 10), days=14,
+        )
+        self.assertIn("Chinese Class", context)
+        self.assertIn("Chemistry Class", context)
+        self.assertIn("Teacher: Mei Lin", context)
+        self.assertNotIn("Advanced Architecture", context)
+        self.assertIn("UNTRUSTED DATA", context)
+
+    def test_ui_keeps_all_imported_classes_and_no_verification_gate(self):
         self.import_fixture()
         seen = []
 
@@ -191,76 +164,50 @@ class VerifiedCalendarTests(unittest.TestCase):
             return {"callback": ""}
 
         with patch.object(planner_ui, "calendar", side_effect=fake_calendar):
-            app = AppTest.from_file(
+            at = AppTest.from_file(
                 str(Path(__file__).resolve().parent / "app.py"),
                 default_timeout=40,
             ).run()
         self.assertEqual(
-            len(app.exception), 0,
-            repr([error.message for error in app.exception]),
+            len(at.exception), 0,
+            repr([x.message for x in at.exception]),
         )
-        self.assertFalse(any(
-            "Architecture" in event["title"] for event in seen
-        ))
-        self.assertTrue(any(
-            "Review imported classes" in md.value
-            for md in app.get("markdown")
-        ) or any(
-            "Review imported classes" in str(exp.label)
-            for exp in app.get("expander")
-        ))
+        titles = [event["title"] for event in seen]
+        self.assertEqual(titles.count("Chinese Class"), 2)
+        self.assertIn("Chemistry Class", titles)
+        self.assertNotIn("UNVERIFIED", " ".join(titles))
+        self.assertNotIn(
+            "planner_show_unverified_imports",
+            [x.key for x in at.checkbox],
+        )
 
-    def test_existing_source_rows_not_deleted_by_verification(self):
+    def test_no_data_is_deleted_or_rewritten_by_new_calendar_behavior(self):
         ids = self.import_fixture()
-        planner.set_imported_personal_status(ids[0], "mine")
-        planner.set_imported_personal_status(ids[2], "not_mine")
-        for item_id in ids:
-            self.assertIsNotNone(planner.get_item(item_id))
+        before = [planner.get_item(uid) for uid in ids]
+        cc.schedule_for_range(date(2026, 10, 12), date(2026, 10, 18))
+        after = [planner.get_item(uid) for uid in ids]
+        self.assertEqual(before, after)
 
-    def test_reimport_preserves_confirmation_for_new_recurrence(self):
-        from google_calendar_import import import_google_calendar
-
-        def calendar_export(count):
-            lines = [
-                "BEGIN:VCALENDAR", "VERSION:2.0",
-                "BEGIN:VEVENT", "UID:verified-class@example.edu",
-                "DTSTART;TZID=America/New_York:20261012T100000",
-                "DTEND;TZID=America/New_York:20261012T110000",
-                f"RRULE:FREQ=WEEKLY;COUNT={count}",
-                "SUMMARY:My actual Physics Class", "END:VEVENT",
-                "END:VCALENDAR", "",
-            ]
-            return "\r\n".join(lines).encode("utf-8")
-
-        import_google_calendar(
-            calendar_export(2), "school.ics",
-            from_date=date(2026, 10, 1), months=2,
+    def test_unknown_subject_returns_missing_not_model_output(self):
+        self.import_fixture()
+        output, acted = conv.respond(
+            "When is my next advanced engineering class?",
+            now=datetime(2026, 10, 10),
+            model="__aaron_trained__",
         )
-        first_import = [
-            r for r in planner.items_for_calendar()
-            if r.get("source") == "google_calendar"
-        ]
-        self.assertEqual(len(first_import), 2)
-        planner.set_imported_personal_status(first_import[0]["id"], "mine")
-        import_google_calendar(
-            calendar_export(3), "school.ics",
-            from_date=date(2026, 10, 1), months=2,
-        )
-        rows = [
-            r for r in planner.items_for_calendar()
-            if r.get("source") == "google_calendar"
-        ]
-        self.assertEqual(len(rows), 3)
-        self.assertTrue(all(r["personal_status"] == "mine" for r in rows))
+        self.assertFalse(acted)
+        self.assertIn("can't find", output.lower())
+        self.assertNotIn("10:05", output)
 
-    def test_full_title_mode_is_stacked_week_and_scrollable(self):
+    def test_full_title_mode_remains_stacked_and_scrollable(self):
         from planner_ui import CALENDAR_CSS, _readable_week_agenda
         from inspect import getsource
         src = getsource(planner_ui.calendar_page)
         self.assertIn('"initialView": "dayGridWeek"', src)
-        self.assertIn('height=390', getsource(_readable_week_agenda))
-        self.assertIn('planner_read_full_', getsource(_readable_week_agenda))
-        self.assertIn('font-size:14px', CALENDAR_CSS)
+        self.assertIn("height=390", getsource(_readable_week_agenda))
+        self.assertIn("planner_read_full_", getsource(_readable_week_agenda))
+        self.assertIn("font-size:14px", CALENDAR_CSS)
+
 
 if __name__ == "__main__":
     unittest.main()
