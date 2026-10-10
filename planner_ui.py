@@ -72,8 +72,27 @@ CALENDAR_CSS = """
 .fc .fc-event-title,.fc .fc-list-event-title{
   font-size:13px!important;font-weight:780!important;
   line-height:1.45!important;overflow-wrap:break-word!important}
-.fc .fc-daygrid-event .fc-event-title{display:block!important;
-  white-space:normal!important;text-overflow:clip!important}
+.fc .fc-daygrid-event .fc-event-title{
+  display:block!important;white-space:normal!important;
+  text-overflow:clip!important;overflow:visible!important;
+  overflow-wrap:break-word!important;word-break:normal!important;
+  -webkit-line-clamp:unset!important;line-clamp:unset!important;
+  max-height:none!important;font-size:14px!important;
+  font-weight:800!important;line-height:1.48!important}
+.fc .fc-daygrid-event,.fc .fc-daygrid-event .fc-event-main{
+  white-space:normal!important;overflow:visible!important;height:auto!important}
+.fc .fc-daygrid-event .fc-event-main-frame{
+  display:flex!important;flex-direction:column!important;align-items:flex-start!important;
+  white-space:normal!important;overflow:visible!important;height:auto!important}
+.fc .fc-daygrid-event .fc-event-time{
+  display:block!important;font-size:11px!important;margin-bottom:2px!important}
+.fc .fc-daygrid-day-events{min-height:120px!important}
+.fc .fc-daygrid-event-harness{margin-bottom:5px!important}
+.fc .fc-list-event-title a{white-space:normal!important;overflow-wrap:break-word!important;
+  font-size:15px!important;font-weight:800!important;line-height:1.55!important}
+/* A readable stacked week is the default; the timed grid remains optional. */
+.fc .fc-dayGridWeek-view .fc-event-main,.fc .fc-dayGridWeek-view .fc-event-title{
+  overflow:visible!important;white-space:normal!important}
 .fc .fc-timegrid-event .fc-event-main{padding:2px 4px!important}
 .fc .fc-timegrid-event .fc-event-title{max-height:none!important}
 .fc .fc-daygrid-more-link{font-size:13px!important;
@@ -487,8 +506,8 @@ def calendar_page():
     ):
         _open_calendar_popup(kind="event")
     hint.caption(
-        "Click a class to see its FULL title and attached assignments, "
-        "or click/drag an empty slot to create something."
+        "**Readable Week** shows complete names in stacked event cards. "
+        "Use **Hour Grid** when you want a time-of-day layout."
     )
 
     # Full-width calendar. Weekly occurrences are expanded only for the
@@ -505,24 +524,35 @@ def calendar_page():
             if calendar_event["id"] == selected_event_id:
                 calendar_event["classNames"] = ["aaron-event-selected"]
     options = {
-        "initialView": "timeGridWeek",
+        # The hour-grid has short blocks that physically cannot fit class
+        # titles. Show full-height stacked class cards by default instead.
+        "initialView": "dayGridWeek",
         "headerToolbar": {
             "left": "today prev,next",
             "center": "title",
-            "right": "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
+            "right": "dayGridWeek,timeGridWeek,dayGridMonth,timeGridDay,listWeek",
         },
         "views": {
+            "dayGridWeek": {
+                "buttonText": "Readable Week",
+                "dayMaxEventRows": False,
+            },
             "dayGridMonth": {
+                "buttonText": "Month",
                 "dayMaxEventRows": 5,
                 "fixedWeekCount": False,
             },
             "timeGridWeek": {
+                "buttonText": "Hour Grid",
                 "slotMinTime": "06:00:00",
                 "slotMaxTime": "23:00:00",
             },
+            "timeGridDay": {"buttonText": "Day"},
+            "listWeek": {"buttonText": "Agenda"},
         },
         "firstDay": 1,
-        "height": 980,
+        # Let full-name rows grow; a fixed 980px clips heavily booked days.
+        "height": "auto",
         "expandRows": True,
         "nowIndicator": True,
         "editable": False,
@@ -540,7 +570,7 @@ def calendar_page():
         "slotDuration": "00:30:00",
         "scrollTime": "08:00:00",
         "allDaySlot": True,
-        "dayMaxEvents": 5,
+        "dayMaxEvents": False,
         "moreLinkClick": "popover",
         "eventDisplay": "block",
         "buttonText": {
@@ -553,7 +583,9 @@ def calendar_page():
         options=options,
         custom_css=CALENDAR_CSS,
         callbacks=["dateClick", "eventClick", "select"],
-        key="aaron_planner_calendar_v2",
+        # New key intentionally resets persisted Week/Hour-Grid selection
+        # from older versions so the readable view is actually displayed.
+        key="aaron_planner_calendar_readable_v8",
     )
     if isinstance(result, dict):
         callback = result.get("callback")
@@ -587,9 +619,9 @@ def calendar_page():
             st.session_state.pop("planner_last_click", None)
 
     st.caption(
-        "Bigger calendar · click an event to read/edit in a popup · click or "
-        "drag an empty time slot to add one · use Month, Week, Day, or Agenda. "
-        "Long titles also appear in full when opened."
+        "The default Readable Week view stacks events with their full titles "
+        "instead of squeezing them into tiny hour blocks. Hour Grid is still "
+        "available. Click a class or assignment to open its details."
     )
 
     # Keep the planner itself uncluttered; supporting panels sit BELOW it.
