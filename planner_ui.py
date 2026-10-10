@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import html
 import sqlite3
+from calendar import monthrange
 from datetime import date, datetime, time, timedelta
 
 import streamlit as st
@@ -152,6 +153,82 @@ CALENDAR_CSS = """
 @media(max-width:850px){.fc .fc-toolbar-title{font-size:1.04rem}
  .fc .fc-button{font-size:.75rem;padding:.4em .55em}}
 """
+
+
+CALENDAR_VIEWS = {
+    "Week": "timeGridWeek",
+    "Day": "timeGridDay",
+    "Month": "dayGridMonth",
+    "Agenda": "listWeek",
+}
+
+
+def _move_calendar_date(anchor, view, step):
+    """Move to the neighboring calendar period without altering saved events."""
+    if view == "Month":
+        # Preserve day-of-month where possible across short months.
+        month_index = anchor.year * 12 + (anchor.month - 1) + step
+        year, zero_based_month = divmod(month_index, 12)
+        month = zero_based_month + 1
+        return date(year, month, min(anchor.day, monthrange(year, month)[1]))
+    days = 1 if view == "Day" else 7
+    return anchor + timedelta(days=step * days)
+
+
+def _calendar_period_heading(anchor, view):
+    if view == "Month":
+        return anchor.strftime("%B %Y")
+    if view == "Day":
+        return anchor.strftime("%A, %B %d, %Y")
+    week_start = anchor - timedelta(days=anchor.weekday())
+    week_end = week_start + timedelta(days=6)
+    if week_start.year != week_end.year:
+        return week_start.strftime("%b %d, %Y") + " – " + week_end.strftime("%b %d, %Y")
+    if week_start.month != week_end.month:
+        return week_start.strftime("%b %d") + " – " + week_end.strftime("%b %d, %Y")
+    return week_start.strftime("%b %d") + " – " + week_end.strftime("%d, %Y")
+
+
+def _render_calendar_navigation(today):
+    """Use native Streamlit controls instead of iframe toolbar buttons.
+
+    Changing the period changes FullCalendar's widget key to apply initialDate
+    and initialView reliably. Neither operation writes to calendar storage.
+    """
+    anchor = _safe_day(st.session_state.get("planner_calendar_anchor", today))
+    view = st.session_state.get("planner_calendar_view", "Week")
+    if view not in CALENDAR_VIEWS:
+        view = "Week"
+
+    arrows, heading, choices = st.columns(
+        [1.5, 2.5, 2.5], gap="small", vertical_alignment="center"
+    )
+    with arrows:
+        back, now, forward = st.columns([1, 1.4, 1], gap="small")
+        if back.button("←", key="planner_calendar_prev", help="Previous " + view.lower(),
+                       use_container_width=True):
+            st.session_state["planner_calendar_anchor"] = _move_calendar_date(
+                anchor, view, -1
+            )
+            st.rerun()
+        if now.button("Today", key="planner_calendar_today",
+                      use_container_width=True):
+            st.session_state["planner_calendar_anchor"] = today
+            st.rerun()
+        if forward.button("→", key="planner_calendar_next", help="Next " + view.lower(),
+                          use_container_width=True):
+            st.session_state["planner_calendar_anchor"] = _move_calendar_date(
+                anchor, view, 1
+            )
+            st.rerun()
+    with heading:
+        st.markdown("**" + _calendar_period_heading(anchor, view) + "**")
+    with choices:
+        selected_view = st.segmented_control(
+            "View", list(CALENDAR_VIEWS), default="Week",
+            key="planner_calendar_view", label_visibility="collapsed",
+        )
+    return anchor, selected_view if selected_view in CALENDAR_VIEWS else "Week"
 
 
 def _safe_day(raw):
@@ -573,8 +650,10 @@ def calendar_page():
 
     # Full-width calendar. Weekly occurrences are expanded only for the
     # supported nearby range; the single canonical event remains editable.
-    range_start = today - timedelta(days=365)
-    range_end = today + timedelta(days=730)
+    anchor, current_view = _render_calendar_navigation(today)
+    # Include the requested period even if the user browses outside this year.
+    range_start = min(today, anchor) - timedelta(days=365)
+    range_end = max(today, anchor) + timedelta(days=730)
     all_events = calendar_events(
         items_for_calendar(start=range_start, end=range_end),
         start=range_start, end=range_end,
@@ -598,13 +677,13 @@ def calendar_page():
     options = {
         # One chronological week. FullCalendar computes the vertical position
         # from each actual minute (08:10, 09:05, etc.), not a rough time slot.
-        "initialView": "timeGridWeek",
+        "initialView": CALENDAR_VIEWS[current_view],
+        "initialDate": anchor.isoformat(),
         "timeZone": "local",
-        "headerToolbar": {
-            "left": "today prev,next",
-            "center": "title",
-            "right": "timeGridWeek,timeGridDay,dayGridMonth,listWeek",
-        },
+        # Streamlit's own navigation buttons above are the sole controls.
+        # A FullCalendar view switch inside the component is not guaranteed
+        # to survive rerendering and can appear unresponsive.
+        "headerToolbar": False,
         "views": {
             "timeGridWeek": {"buttonText": "Week"},
             "timeGridDay": {"buttonText": "Day"},
@@ -655,10 +734,9 @@ def calendar_page():
         options=options,
         custom_css=CALENDAR_CSS,
         callbacks=["dateClick", "eventClick", "select"],
-        # New key intentionally resets persisted Week/Hour-Grid selection
-        # from older versions so the readable view is actually displayed.
-        # A fresh key resets the previous stacked-week selection on upgrade.
-        key="aaron_planner_aligned_week_v11",
+        # Only changing the selected period/view remounts the iframe;
+        # unrelated Streamlit reruns keep the same calendar instance.
+        key=f"aaron_calendar_nav_v12_{current_view}_{anchor.isoformat()}",
     )
     if isinstance(result, dict):
         callback = result.get("callback")
