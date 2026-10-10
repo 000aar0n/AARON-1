@@ -206,8 +206,7 @@ hr{border-color:var(--a-border)!important}
  .fc .fc-toolbar-title{font-size:15px!important}
 }
 </style>
-""".replace("UNICODE_FONT_IMPORT", FONT_IMPORT)
-   .replace("UNICODE_FONT_STACK", FONT_STACK)
+""".replace("UNICODE_FONT_IMPORT", FONT_IMPORT).replace("UNICODE_FONT_STACK", FONT_STACK)
 
 def install_theme():
     st.markdown(STYLE, unsafe_allow_html=True)
