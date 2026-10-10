@@ -122,7 +122,8 @@ def render_connections():
                 key="aaron_export_backup",
             )
         except (ValueError, OSError, RuntimeError) as exc:
-            st.error("Could not prepare data backup: " + str(exc))
+            st.error("Could not prepare data backup.")
+            st.info(_database_startup_help(exc))
         with st.expander("Restore a saved backup"):
             st.caption(
                 "Restores missing entries only. Existing records are not overwritten "
@@ -145,7 +146,8 @@ def render_connections():
                     st.success(f"Restored {recovered} previously missing records.")
                     st.rerun()
                 except (ValueError, RuntimeError, OSError) as exc:
-                    st.error("Restore failed: " + str(exc))
+                    st.error("Restore failed; no existing rows were intentionally removed.")
+                    st.info(_database_startup_help(exc))
 
     with st.container(border=True):
         st.markdown("### Gmail")
