@@ -160,23 +160,23 @@ class CalendarFeatureTests(unittest.TestCase):
 
     def test_google_cancellation_preserves_linked_homework(self):
         from google_calendar_import import import_google_calendar
-        head = "BEGIN:VCALENDAR\\r\\nVERSION:2.0\\r\\n"
+        head = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n"
         master = (
-            "BEGIN:VEVENT\\r\\nUID:chem-class@calendar\\r\\n"
-            "DTSTART;TZID=America/New_York:20261012T140000\\r\\n"
-            "DTEND;TZID=America/New_York:20261012T150000\\r\\n"
-            "RRULE:FREQ=WEEKLY;COUNT=2\\r\\n"
-            "SUMMARY:Chemistry\\r\\nEND:VEVENT\\r\\n"
+            "BEGIN:VEVENT\r\nUID:chem-class@calendar\r\n"
+            "DTSTART;TZID=America/New_York:20261012T140000\r\n"
+            "DTEND;TZID=America/New_York:20261012T150000\r\n"
+            "RRULE:FREQ=WEEKLY;COUNT=2\r\n"
+            "SUMMARY:Chemistry\r\nEND:VEVENT\r\n"
         )
         cancelled = (
-            "BEGIN:VEVENT\\r\\nUID:chem-class@calendar\\r\\n"
-            "RECURRENCE-ID;TZID=America/New_York:20261012T140000\\r\\n"
-            "DTSTART;TZID=America/New_York:20261012T140000\\r\\n"
-            "DTEND;TZID=America/New_York:20261012T150000\\r\\n"
-            "STATUS:CANCELLED\\r\\n"
-            "SUMMARY:Chemistry\\r\\nEND:VEVENT\\r\\n"
+            "BEGIN:VEVENT\r\nUID:chem-class@calendar\r\n"
+            "RECURRENCE-ID;TZID=America/New_York:20261012T140000\r\n"
+            "DTSTART;TZID=America/New_York:20261012T140000\r\n"
+            "DTEND;TZID=America/New_York:20261012T150000\r\n"
+            "STATUS:CANCELLED\r\n"
+            "SUMMARY:Chemistry\r\nEND:VEVENT\r\n"
         )
-        initial = (head + master + "END:VCALENDAR\\r\\n").encode()
+        initial = (head + master + "END:VCALENDAR\r\n").encode()
         import_google_calendar(
             initial, "mycalendar.ics", from_date=date(2026, 10, 1), months=2,
         )
@@ -188,7 +188,7 @@ class CalendarFeatureTests(unittest.TestCase):
             title="Practice equations", due="2026-10-14",
             linked_event_id=parent["id"],
         )
-        altered = (head + master + cancelled + "END:VCALENDAR\\r\\n").encode()
+        altered = (head + master + cancelled + "END:VCALENDAR\r\n").encode()
         result = import_google_calendar(
             altered, "mycalendar.ics", from_date=date(2026, 10, 1), months=2,
         )
@@ -201,10 +201,10 @@ class CalendarFeatureTests(unittest.TestCase):
         from planner_ui import _render_editor
         parent = self.create_weekly()
         script = (
-            "import streamlit as st\\n"
-            "from planner_ui import _render_editor\\n"
-            f"st.session_state.setdefault('planner_editor_id', {parent!r})\\n"
-            "_render_editor(scope='calendar')\\n"
+            "import streamlit as st\n"
+            "from planner_ui import _render_editor\n"
+            f"st.session_state.setdefault('planner_editor_id', {parent!r})\n"
+            "_render_editor(scope='calendar')\n"
         )
         app = AppTest.from_string(script, default_timeout=30).run()
         self.assertEqual(len(app.exception), 0, repr([e.message for e in app.exception]))
