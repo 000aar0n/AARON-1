@@ -58,6 +58,21 @@ def add_example(prompt, response, source="manual"):
     identifier = str(uuid.uuid4())
     with connect() as db:
         _init(db)
+        previous = db.execute(
+            "SELECT id FROM training_examples WHERE lower(prompt)=lower(?)",
+            (prompt,),
+        ).fetchone()
+        if previous:
+            # A correction replaces an older preference for the same prompt;
+            # never train conflicting responses to an identical question.
+            db.execute(
+                "UPDATE training_examples SET response=?, source=?, created_at=? "
+                "WHERE id=?",
+                (response, source, datetime.now(timezone.utc).isoformat(),
+                 previous["id"]),
+            )
+            db.commit()
+            return previous["id"]
         count = db.execute("SELECT count(*) FROM training_examples").fetchone()[0]
         if count >= MAX_EXAMPLES:
             raise ValueError("Training example limit reached")
@@ -224,7 +239,9 @@ def recent_jobs(limit=10):
             jobs.append(json.loads(path.read_text(encoding="utf-8")))
         except (OSError, ValueError):
             continue
-    return jobs
+    return sorted(
+        jobs, key=lambda job: job.get("started_at", ""), reverse=True
+    )[:limit]
 
 
 def trained_model():
