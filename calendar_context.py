@@ -55,8 +55,8 @@ def format_schedule(entries, label, *, max_events=35):
         return (
             f"I don't have any **confirmed personal calendar events** for {label}. "
             + (
-                f"There are {pending} imported school-calendar entries awaiting "
-                "verification, which could belong to other students. "
+                f"There are {pending} **unverified** imported school-calendar "
+                "entries, which could belong to other students. "
                 "Use Planner → Review imported classes to mark your own. "
                 if pending else ""
             )
