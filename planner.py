@@ -173,16 +173,14 @@ def create_item(*, title, due=None, due_time=None, description="",
 
 
 def is_verified_personal(item):
-    """Only explicitly accepted Google events can be called *your* classes.
+    """Compatibility helper: this user's imported calendar is personal.
 
-    Locally entered work, Winter Arc sessions, and other direct user-authorized
-    items keep working. Unverified / rejected imported Google events never
-    appear in personal schedule answers or language-model context.
+    The old 'unverified' status was based on an incorrect assumption that a
+    personal Google export was school-wide. Preserve the original database
+    and treat *all* imported calendar entries as the user's; ownership should
+    never be inferred from generated text. This helper retains the old name
+    for existing callers while treating imported records normally.
     """
-    if str(item.get("personal_status") or "") == "not_mine":
-        return False
-    if item.get("source") == "google_calendar":
-        return item.get("personal_status") == "mine"
     return True
 
 
@@ -695,10 +693,7 @@ def calendar_events(items, *, start=None, end=None):
                 item["id"] + "::" + day if item.get("repeat_weekly") else item["id"]
             )
             title_prefix = (
-                "⚠ UNVERIFIED · "
-                if item.get("source") == "google_calendar"
-                and item.get("personal_status") != "mine"
-                else "✓ " if is_done else "↻ " if item.get("repeat_weekly")
+                "✓ " if is_done else "↻ " if item.get("repeat_weekly")
                 else "📎 " if item.get("linked_event_id") else ""
             )
             start_at = f"{day}T{hm}:00" if hm else day
