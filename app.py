@@ -4,11 +4,7 @@ No LLM, agent network, mock multi-agent population, or access without permission
 """
 from __future__ import annotations
 
-import calendar
 import html
-from datetime import timedelta
-from collections import defaultdict
-from datetime import date
 
 import streamlit as st
 
@@ -22,7 +18,10 @@ from gmail_access import (
     list_messages, make_auth_url, store_client_upload,
 )
 from avatar import render_face
-from ui_theme import install_theme, header, page_heading, metric
+from ui_theme import install_theme, header, page_heading
+from planner_ui import calendar_page, tasks_page
+from planner import ensure_schema
+from assistant_conversation import respond, local_models
 
 st.set_page_config(page_title="AARON-1", page_icon="🤖", layout="wide")
 
@@ -51,397 +50,35 @@ def messages(limit=25):
 
 
 def answer(message):
-    lower = message.lower()
-    if any(word in lower for word in ("email", "inbox", "gmail", "mail")):
+    lower = message.lower().strip()
+    if any(phrase in lower for phrase in (
+        "check my email", "check my gmail", "show my inbox", "latest emails",
+        "new email", "my mail", "read my email",
+    )):
         if not connected():
-            return ("Gmail isn't connected yet. Open Connect, authorize your Gmail "
-                    "account, then ask me again. I can only read messages.")
+            return ("Gmail isn't connected yet. Open Connections and authorize "
+                    "read-only Gmail access first.")
         try:
-            recent = list_messages(search="in:inbox", max_results=5)
+            recent = list_messages(search="in:inbox", max_results=6)
             if not recent:
-                return "Your inbox has no messages matching the current search."
-            lines = [f"• {item['subject']} — {item['from']}" for item in recent]
-            return "Here are the latest inbox subjects:\n" + "\n".join(lines)
+                return "No inbox messages matched that search."
+            return "Latest Gmail inbox subjects:\\n" + "\\n".join(
+                f"• {item['subject']} — {item['from']}" for item in recent
+            )
         except Exception:
-            return ("I couldn't load Gmail. Reconnect in the Connect tab if "
-                    "your authorization has expired.")
-    return concise_reply(message)
+            return "Gmail couldn't be read. Check its authorization under Connections."
+
+    model = st.session_state.get("aaron_selected_chat_model")
+    response, _ = respond(message, previous=messages(limit=12), model=model)
+    return response
 
 
 def render_tasks():
-    """Clean, focused assignment list with personal priority learning."""
-    page_heading(
-        "Get things done",
-        "Assignments",
-        "Your workload, organized. Mark tasks important to teach AARON-1 your priorities.",
-    )
-    all_tasks = ranked_tasks()
-    today = date.today()
-    overdue = [
-        task for task in all_tasks
-        if task.get("due") and task["due"] < today.isoformat()
-    ]
-    next_week = [
-        task for task in all_tasks
-        if task.get("due") and
-        today.isoformat() <= task["due"] <= (today + timedelta(days=7)).isoformat()
-    ]
-
-    k1, k2, k3 = st.columns(3, gap="medium")
-    with k1:
-        metric("To do", len(all_tasks), "Open assignments")
-    with k2:
-        metric("Due this week", len(next_week), "Next seven days")
-    with k3:
-        metric("Overdue", len(overdue), "Needs attention")
-
-    left, right = st.columns([3.5, 1.5], gap="large")
-    with right:
-        with st.container(border=True, key="task-add-panel"):
-            st.markdown('<div class="eyebrow">QUICK ADD</div>',
-                        unsafe_allow_html=True)
-            st.markdown("**New assignment**")
-            with st.form("new_task", clear_on_submit=True):
-                title = st.text_input(
-                    "Task", placeholder="Finish geometry homework"
-                )
-                has_due = st.checkbox("Set a due date", value=False)
-                due = st.date_input("Due date", value=today) if has_due else None
-                if st.form_submit_button(
-                    "+ Add assignment", type="primary", use_container_width=True
-                ):
-                    try:
-                        add_task(title, due=due.isoformat() if due else None)
-                        st.rerun()
-                    except ValueError as exc:
-                        st.error(str(exc))
-        st.caption("You can also add assignments by clicking a day in the calendar.")
-
-    with left:
-        filter_choice = st.selectbox(
-            "Show tasks",
-            ["All open", "Due this week", "Overdue", "No due date"],
-            index=0, label_visibility="collapsed",
-            key="task_filter",
-        )
-        if filter_choice == "Due this week":
-            visible = next_week
-        elif filter_choice == "Overdue":
-            visible = overdue
-        elif filter_choice == "No due date":
-            visible = [task for task in all_tasks if not task.get("due")]
-        else:
-            visible = all_tasks
-
-        if not visible:
-            st.info("Nothing here yet. Add an assignment using the panel.")
-
-        for task in visible[:100]:
-            with st.container(border=True, key=f"task-row-{task['id']}"):
-                info, priority = st.columns([4.7, 1.1], gap="small")
-                with info:
-                    st.markdown(
-                        '<div class="task-title">' +
-                        html.escape(task["title"]) + "</div>",
-                        unsafe_allow_html=True,
-                    )
-                    detail = []
-                    if task.get("due"):
-                        formatted = date.fromisoformat(task["due"])
-                        detail.append("Due " + formatted.strftime("%b ") + str(formatted.day))
-                    else:
-                        detail.append("No due date")
-                    if task.get("source") != "manual":
-                        detail.append(task["source"].capitalize())
-                    st.markdown(
-                        '<div class="task-meta">' +
-                        html.escape(" · ".join(detail)) + "</div>",
-                        unsafe_allow_html=True,
-                    )
-                with priority:
-                    st.markdown(
-                        '<div class="task-status">' +
-                        str(round(score_task(task) * 100)) +
-                        '% priority</div>',
-                        unsafe_allow_html=True,
-                    )
-                done_col, high_col, low_col = st.columns([1.1, 1.5, 1.7], gap="small")
-                if done_col.button("✓ Done", key="done_" + task["id"],
-                                   use_container_width=True):
-                    update_task(task["id"], completed=True)
-                    st.rerun()
-                if high_col.button("↑ Important", key="important_" + task["id"],
-                                   use_container_width=True):
-                    learn_priority(task["id"], True)
-                    st.rerun()
-                if low_col.button("↓ Not urgent", key="not_" + task["id"],
-                                  use_container_width=True):
-                    learn_priority(task["id"], False)
-                    st.rerun()
-
-        if len(visible) > 100:
-            st.caption("Showing the first 100 tasks.")
-        with st.expander("Completed assignments"):
-            completed = [
-                task for task in list_tasks(include_completed=True, limit=500)
-                if task["completed"]
-            ]
-            if not completed:
-                st.caption("No completed assignments yet.")
-            for task in completed:
-                task_col, reopen_col = st.columns([5, 1])
-                task_col.write(task["title"])
-                if reopen_col.button("Reopen", key="reopen_" + task["id"]):
-                    update_task(task["id"], completed=False)
-                    st.rerun()
+    tasks_page()
 
 
 def render_calendar():
-    """Interactive monthly view with a focused day panel and real task actions."""
-    today = date.today()
-    if "calendar_month" not in st.session_state:
-        st.session_state["calendar_month"] = today.replace(day=1).isoformat()
-    if "calendar_selected" not in st.session_state:
-        st.session_state["calendar_selected"] = today.isoformat()
-
-    month = date.fromisoformat(st.session_state["calendar_month"])
-    selected = date.fromisoformat(st.session_state["calendar_selected"])
-    if (selected.year, selected.month) != (month.year, month.month):
-        selected = month
-        st.session_state["calendar_selected"] = selected.isoformat()
-
-    page_heading(
-        "Plan your week",
-        "Your calendar",
-        "A clear view of what's due, what's finished, and what needs your attention.",
-    )
-
-    month_tasks = tasks_due_in_month(month.year, month.month)
-    by_day = defaultdict(list)
-    for task in month_tasks:
-        by_day[task["due"]].append(task)
-    remaining = [task for task in month_tasks if not task["completed"]]
-    today_tasks = tasks_due_in_month(today.year, today.month)
-    today_count = sum(
-        task["due"] == today.isoformat() and not task["completed"]
-        for task in today_tasks
-    )
-    completed_count = len(month_tasks) - len(remaining)
-
-    a, b, c = st.columns(3, gap="medium")
-    with a:
-        metric("Assignments due", len(remaining), "In " + month.strftime("%B"))
-    with b:
-        metric("Due today", today_count, today.strftime("%a, %b %d"))
-    with c:
-        metric("Finished", completed_count, "Completed this month")
-
-    grid_column, detail_column = st.columns([7.3, 3.7], gap="large")
-    with grid_column:
-        nav_prev, nav_title, nav_today, nav_next = st.columns(
-            [0.8, 4.6, 1.25, 0.8], gap="small", vertical_alignment="center"
-        )
-        with nav_prev:
-            if st.button("‹", key="cal_prev", help="Previous month",
-                         use_container_width=True):
-                target = change_month(month, -1)
-                st.session_state["calendar_month"] = target.isoformat()
-                st.session_state["calendar_selected"] = target.isoformat()
-                st.rerun()
-        with nav_title:
-            st.markdown(
-                '<div class="cal-month">' +
-                html.escape(month.strftime("%B %Y")) + "</div>",
-                unsafe_allow_html=True,
-            )
-        with nav_today:
-            if st.button("Today", key="cal_today", use_container_width=True):
-                st.session_state["calendar_month"] = today.replace(day=1).isoformat()
-                st.session_state["calendar_selected"] = today.isoformat()
-                st.rerun()
-        with nav_next:
-            if st.button("›", key="cal_next", help="Next month",
-                         use_container_width=True):
-                target = change_month(month, 1)
-                st.session_state["calendar_month"] = target.isoformat()
-                st.session_state["calendar_selected"] = target.isoformat()
-                st.rerun()
-
-        weekdays = st.columns(7, gap="small")
-        for column, name in zip(weekdays, ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")):
-            with column:
-                st.markdown('<div class="cal-weekday">' + name + "</div>",
-                            unsafe_allow_html=True)
-
-        for week in calendar.Calendar(firstweekday=0).monthdatescalendar(
-            month.year, month.month
-        ):
-            columns = st.columns(7, gap="small")
-            for column, day in zip(columns, week):
-                with column:
-                    style = ("outside" if day.month != month.month else
-                             "selected" if day == selected else
-                             "today" if day == today else "normal")
-                    with st.container(
-                        border=False, height=124,
-                        key=f"cal-cell-{style}-{day.isoformat()}",
-                    ):
-                        if day.month != month.month:
-                            st.markdown(
-                                f'<div class="cal-outside-date">{day.day}</div>',
-                                unsafe_allow_html=True,
-                            )
-                            continue
-
-                        day_items = by_day.get(day.isoformat(), [])
-                        unfinished = [item for item in day_items if not item["completed"]]
-                        if st.button(
-                            str(day.day), key=f"cal_day_{day.isoformat()}",
-                            use_container_width=False,
-                            help=(f"Select {day.strftime('%B %d')}: "
-                                  f"{len(unfinished)} remaining"),
-                        ):
-                            st.session_state["calendar_selected"] = day.isoformat()
-                            st.rerun()
-                        if day == today:
-                            st.markdown(
-                                '<span class="cal-today-flag">TODAY</span>',
-                                unsafe_allow_html=True,
-                            )
-                        if unfinished:
-                            chips = []
-                            for item in unfinished[:2]:
-                                subject_class = (
-                                    " school" if item.get("source") in ("blackbaud", "calendar")
-                                    else ""
-                                )
-                                chips.append(
-                                    '<div class="cal-event' + subject_class + '" title="' +
-                                    html.escape(item["title"], quote=True) + '">' +
-                                    html.escape(item["title"]) + "</div>"
-                                )
-                            if len(unfinished) > 2:
-                                chips.append(
-                                    '<div class="cal-more">+' +
-                                    str(len(unfinished) - 2) + " more</div>"
-                                )
-                            chips.append(
-                                '<div class="cal-count">' +
-                                str(len(unfinished)) + ' due</div>'
-                            )
-                            st.markdown(
-                                '<div class="cal-events">' + "".join(chips) + "</div>",
-                                unsafe_allow_html=True,
-                            )
-                        elif day_items:
-                            st.markdown('<div class="cal-finished">✓ All done</div>',
-                                        unsafe_allow_html=True)
-                        else:
-                            st.markdown('<div class="cal-quiet">—</div>',
-                                        unsafe_allow_html=True)
-
-        st.markdown(
-            '<div class="muted-line" style="margin-top:12px">'
-            '<span style="color:#a79cff">●</span> Personal tasks &nbsp;&nbsp;'
-            '<span style="color:#76d6c1">●</span> Imported assignments'
-            '</div>', unsafe_allow_html=True,
-        )
-
-    with detail_column:
-        with st.container(border=True, key="calendar-day-detail"):
-            st.markdown('<div class="eyebrow">SELECTED DAY</div>',
-                        unsafe_allow_html=True)
-            st.markdown(
-                '<div class="cal-detail-title">' +
-                html.escape(selected.strftime("%A, %B ")) + str(selected.day) +
-                '</div><div class="cal-detail-sub">' +
-                str(selected.year) + " · " +
-                str(len([t for t in by_day.get(selected.isoformat(), [])
-                         if not t["completed"]])) +
-                ' open assignment(s)</div>',
-                unsafe_allow_html=True,
-            )
-            day_tasks = by_day.get(selected.isoformat(), [])
-            pending = [task for task in day_tasks if not task["completed"]]
-            completed = [task for task in day_tasks if task["completed"]]
-
-            if not pending:
-                st.markdown(
-                    '<div class="cal-no-tasks">All clear for this day. '
-                    'Enjoy the breathing room or add something below.</div>',
-                    unsafe_allow_html=True,
-                )
-
-            for item in pending:
-                with st.container(border=True, key=f"cal-task-{item['id']}"):
-                    st.markdown(
-                        '<div class="cal-task-title">' +
-                        html.escape(item["title"]) + "</div>",
-                        unsafe_allow_html=True,
-                    )
-                    source = ("School import" if item.get("source") in ("blackbaud", "calendar")
-                              else "Gmail" if item.get("source") == "email"
-                              else "Personal task")
-                    st.markdown(
-                        '<div class="cal-task-meta">' +
-                        html.escape(source) + "</div>",
-                        unsafe_allow_html=True,
-                    )
-                    done_col, important_col = st.columns(2, gap="small")
-                    if done_col.button(
-                        "✓ Done", key=f"cal_done_{item['id']}",
-                        use_container_width=True,
-                    ):
-                        update_task(item["id"], completed=True)
-                        st.rerun()
-                    if important_col.button(
-                        "↑ Important", key=f"cal_priority_{item['id']}",
-                        use_container_width=True,
-                    ):
-                        learn_priority(item["id"], True)
-                        st.rerun()
-
-            if completed:
-                with st.expander(f"Completed ({len(completed)})"):
-                    for item in completed:
-                        name_col, reopen_col = st.columns([4, 1.6])
-                        name_col.caption(item["title"])
-                        if reopen_col.button(
-                            "Reopen", key=f"cal_reopen_{item['id']}",
-                        ):
-                            update_task(item["id"], completed=False)
-                            st.rerun()
-
-            st.divider()
-            st.markdown("**Add an assignment**")
-            with st.form("calendar_new_task", clear_on_submit=True):
-                title = st.text_input(
-                    "Task name", placeholder="e.g. Finish chemistry problems",
-                    label_visibility="collapsed",
-                )
-                if st.form_submit_button(
-                    "+ Add to " + selected.strftime("%b ") + str(selected.day),
-                    type="primary", use_container_width=True,
-                ):
-                    try:
-                        add_task(title, due=selected.isoformat())
-                        st.rerun()
-                    except ValueError as exc:
-                        st.error(str(exc))
-
-        no_date = tasks_without_due_date()
-        if no_date:
-            with st.expander(f"Unscheduled tasks ({len(no_date)})"):
-                st.caption("Choose a date on the calendar, then schedule the task.")
-                for item in no_date:
-                    title_col, schedule_col = st.columns([3.2, 1.1])
-                    title_col.caption(item["title"])
-                    if schedule_col.button(
-                        "Set date", key=f"cal_schedule_{item['id']}",
-                        use_container_width=True,
-                    ):
-                        set_task_due_date(item["id"], selected.isoformat())
-                        st.rerun()
+    calendar_page()
 
 
 def render_connections():
@@ -559,42 +196,89 @@ def render_connections():
                  "Never upload Google passwords or private keys to the repository.")
 
 
+@st.cache_data(ttl=45, show_spinner=False)
+def available_local_models():
+    return local_models()
+
+
 def render_chat():
     page_heading(
-        "Your assistant",
-        "Ask AARON-1",
-        "Manage assignments, check a connected Gmail inbox, and teach "
-        "AARON-1 what matters to you.",
+        "Talk to AARON-1", "Your personal AI",
+        "Ask about your day, make plans, and have real conversations "
+        "when you enable a local chat model.",
     )
+    with st.expander("🧠 Conversation settings", expanded=False):
+        available = available_local_models()
+        if available:
+            options = ["Planner only (rules)"] + available
+            current = st.session_state.get("aaron_selected_chat_model")
+            choice = st.selectbox(
+                "Conversation engine", options,
+                index=(options.index(current) if current in options else 1),
+                help="A local model handles open-ended language. Planner actions "
+                     "always use AARON-1's saved tasks and verified commands.",
+                key="aaron_model_picker",
+            )
+            st.session_state["aaron_selected_chat_model"] = (
+                None if choice == "Planner only (rules)" else choice
+            )
+            st.success("Local conversation enabled" if choice != options[0]
+                       else "Using basic rules only")
+        else:
+            st.session_state["aaron_selected_chat_model"] = None
+            st.info(
+                "For full back-and-forth conversations, install Ollama on this "
+                "computer and download a small local model. The planner and "
+                "task commands already work without it."
+            )
+            st.code("ollama pull qwen2.5:3b", language="bash")
+            st.caption("Ollama must be running locally at 127.0.0.1:11434. "
+                       "This option uses a pretrained open model for language, "
+                       "not a neural model AARON-1 trained from scratch.")
+        if st.button("Check for local models", key="refresh_local_models"):
+            available_local_models.clear()
+            st.rerun()
+
     previous = messages()
     if not previous:
-        st.info(
-            "Try asking: **what homework is due**, **add task read chapter 3**, "
-            "or **check my email**."
+        st.markdown(
+            "Ask me something, for example **what should I do next?**, "
+            "**what's due tomorrow?**, or "
+            "**add task finish chemistry due tomorrow at 5pm**."
         )
     for item in previous:
         with st.chat_message(item["role"]):
             st.markdown(item["message"])
-    prompt = st.chat_input("Message AARON-1…")
+    prompt = st.chat_input("Talk to AARON-1…")
     if prompt:
+        history = messages(limit=12)
         write_chat("user", prompt)
-        reply = answer(prompt)
+        # Preserve prior context without repeating the latest user message.
+        reply = answer_with_context(prompt, history)
         write_chat("assistant", reply)
         st.rerun()
 
     with st.expander("Meet AARON-1", expanded=False):
         last = (previous[-1]["message"] if previous
                 and previous[-1]["role"] == "assistant"
-                else "Hi. What can I help with?")
+                else "Yo! What are we doing today?")
         render_face(last, key="home")
-        st.caption(
-            "AARON-1 uses small local models and rules. It doesn't have "
-            "general-purpose language understanding yet."
-        )
+
+
+def answer_with_context(message, history):
+    lower = message.lower()
+    if any(phrase in lower for phrase in (
+        "check my email", "check my gmail", "show my inbox", "latest emails",
+        "new email", "my mail", "read my email",
+    )):
+        return answer(message)
+    model = st.session_state.get("aaron_selected_chat_model")
+    return respond(message, previous=history, model=model)[0]
 
 
 def main():
     init_chat()
+    ensure_schema()
     from assistant_core import migrate_legacy_facts
     migrate_legacy_facts()
 
@@ -612,7 +296,7 @@ def main():
             st.error(f"Gmail connection failed: {exc}")
 
     calendar_tab, task_tab, chat_tab, connection_tab = st.tabs(
-        ["Calendar", "Assignments", "Chat", "Connections"]
+        ["Planner", "Priorities", "Chat", "Connections"]
     )
     with calendar_tab:
         render_calendar()
