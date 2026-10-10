@@ -4,6 +4,63 @@
 
 This version has replaced the sender/receiver, evolution, and sandbox-network experiments. Old experiment source files were removed. Files and checkpoints already saved on your computer under `data/` were **not deleted**; previously taught personal facts are migrated into the new task database.
 
+## Cloud storage, Unicode, and safe Streamlit reboots
+
+**Streamlit Community Cloud is not an always-on host.** It automatically
+hibernates apps after an idle period and does not guarantee local file
+persistence. Keeping the site awake is *not* a substitute for durable storage.
+
+AARON-1 defaults to local SQLite on your own computer for offline development.
+For Streamlit Community Cloud you can configure a remote Turso database; once
+configured, calendar events, tasks, memories, chat history and approved training
+examples are read from and written to the durable remote database instead.
+
+### Move an existing Streamlit installation without losing data
+
+1. **Before changing secrets or rebooting:** open **Settings → Data protection**
+   and choose **Download complete personal-data backup**. Save the private JSON
+   backup somewhere only you can access. It contains calendar and conversation
+   information; **never commit it to GitHub**.
+2. Create a **Turso Database** (new Turso engine) via
+   [Turso's quickstart](https://github.com/tursodatabase/turso-docs/blob/main/quickstart.mdx).
+   The official CLI workflow is
+   `turso db create aaron1 --tursodb`, then
+   `turso db show --url aaron1` and
+   `turso db tokens create aaron1`. These give your remote URL and private token.
+3. In [Streamlit Community Cloud](https://share.streamlit.io), open your app's
+   **Settings → Secrets**. Add the three secrets below (actual values go in
+   Streamlit Secrets, **not** in GitHub files):
+
+   ```toml
+   TURSO_DATABASE_URL = "https://your-database-url"
+   TURSO_AUTH_TOKEN = "your-private-database-token"
+   APP_PASSWORD = "a-long-random-password-unique-to-this-app"
+   ```
+
+4. Reboot your Streamlit app, unlock AARON-1, then open
+   **Settings → Data protection**. Confirm **Persistent database configured**.
+   Use **Restore a saved backup** to import your previously downloaded JSON.
+   Restoration is merge-only: existing records are not deleted or overwritten.
+5. Confirm your calendar and chat data are present. Download a fresh backup.
+   Future sleep/reboots won't wipe data stored in the Turso database, though
+   the site can still sleep.
+
+**Safety:** AARON-1 refuses to run with only one of the two Turso credentials,
+and refuses to reveal a remote-backed personal calendar if APP_PASSWORD is
+missing. If the database is unreachable it raises an error instead of silently
+saving to throwaway local SQLite. AARON-1's export does not include Gmail OAuth
+files, downloaded model weights or local training jobs; those require separate
+storage and backups. If using Streamlit Cloud, keep the app private as well.
+
+### Unicode and special characters
+
+Titles, notes, event names and chat history use UTF-8 and are never converted
+to ASCII. Display fonts fall back to installed system CJK, symbol, math and
+emoji families. The explicit **Send** button in Chat avoids IME composition
+committing partial Chinese Pinyin messages. Glyph appearance depends on the
+viewer's browser and installed fonts; no website can guarantee that *every*
+Unicode glyph looks identical on all devices.
+
 ## 🪟 Windows 10/11 (no administrator privileges required)
 
 AARON-1 runs locally on **64-bit Windows 10 or Windows 11**, as well as
