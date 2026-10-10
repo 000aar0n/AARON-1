@@ -338,6 +338,25 @@ def calendar_page():
         _action_list(limit=4)
 
     with right:
+        st.markdown("#### 🎯 What to do now")
+        if actions:
+            top = actions[0]
+            with st.container(border=True, key="next_task_spotlight"):
+                st.markdown("**" + html.escape(top["title"]) + "**")
+                st.caption(_format_deadline(top) + " · " + top["why"])
+                if top.get("notes"):
+                    st.caption("Notes: " + str(top["notes"])[:160])
+                done, edit = st.columns(2)
+                if done.button("✓ Done", key="spotlight_done",
+                               use_container_width=True):
+                    toggle_complete(top["id"], True)
+                    st.rerun()
+                if edit.button("Edit task", key="spotlight_edit",
+                               use_container_width=True):
+                    _choose_item(top["id"])
+                    st.rerun()
+        else:
+            st.success("Nothing urgent — you're all caught up.")
         top1, top2 = st.columns(2)
         if top1.button("+ New task", use_container_width=True, type="primary",
                        key="planner_new_task"):
