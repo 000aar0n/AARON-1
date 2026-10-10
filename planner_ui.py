@@ -164,7 +164,7 @@ def _render_editor():
                 format_func=lambda p: PRIORITY_NAMES[p],
                 key=f"{prefix}_priority",
             )
-            estimate_choices = [10, 15, 20, 30, 45, 60, 90, 120, 180, 240]
+            estimate_choices = [10, 15, 20, 30, 45, 60, 75, 90, 120, 180, 240]
             previous = int(existing.get("estimated_min") or 30) if existing else 30
             estimate = st.selectbox(
                 "How much work?",
@@ -237,6 +237,8 @@ def _action_list(limit=5):
             grade.caption(f"#{rank}")
             st.caption(f"{_format_deadline(task)} · {PRIORITY_NAMES[int(task.get('priority_level') or 2)]}")
             st.caption("Why: " + task["why"])
+            if task.get("notes"):
+                st.caption("Notes: " + str(task["notes"])[:200])
             c1, c2, c3 = st.columns([1, 1.4, 1], gap="small")
             if c1.button("✓ Done", key=f"rec_done_{task['id']}",
                          use_container_width=True):
