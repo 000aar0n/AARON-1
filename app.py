@@ -69,59 +69,131 @@ def answer(message):
 
 
 def render_tasks():
-    st.subheader("Your assignments & to-dos")
-    st.caption("Add assignments manually or import a calendar under Connect. "
-               "AARON-1 learns what's important from your feedback.")
+    """Clean, focused assignment list with personal priority learning."""
+    page_heading(
+        "Get things done",
+        "Assignments",
+        "Your workload, organized. Mark tasks important to teach AARON-1 your priorities.",
+    )
+    all_tasks = ranked_tasks()
+    today = date.today()
+    overdue = [
+        task for task in all_tasks
+        if task.get("due") and task["due"] < today.isoformat()
+    ]
+    next_week = [
+        task for task in all_tasks
+        if task.get("due") and
+        today.isoformat() <= task["due"] <= (today + timedelta(days=7)).isoformat()
+    ]
 
-    with st.form("new_task", clear_on_submit=True):
-        title = st.text_input("What do you need to do?", placeholder="Finish chemistry problems")
-        due = st.text_input("Due date (optional)", placeholder="YYYY-MM-DD")
-        if st.form_submit_button("Add task", type="primary"):
-            try:
-                add_task(title, due=due or None)
-                st.rerun()
-            except ValueError as exc:
-                st.error(str(exc))
-    rows = ranked_tasks()
-    if not rows:
-        st.info("No open tasks yet. Add one above or import your assignment calendar.")
-    for task in rows[:80]:
-        with st.container(border=True):
-            left, right = st.columns([4, 1])
-            with left:
-                st.markdown(f"**{task['title']}**")
-                detail = []
-                if task.get("due"):
-                    detail.append("Due " + task["due"])
-                if task.get("source") != "manual":
-                    detail.append("From " + task["source"].capitalize())
-                if detail:
-                    st.caption(" · ".join(detail))
-            with right:
-                st.caption(f"Priority {int(score_task(task)*100)}%")
-            c1, c2, c3 = st.columns([1, 1, 1])
-            if c1.button("✓ Done", key="done_" + task["id"]):
-                update_task(task["id"], completed=True)
-                st.rerun()
-            if c2.button("↑ Important", key="important_" + task["id"]):
-                learn_priority(task["id"], True)
-                st.rerun()
-            if c3.button("↓ Not urgent", key="not_" + task["id"]):
-                learn_priority(task["id"], False)
-                st.rerun()
-    st.caption("Importance labels train a small scoring model; it won't complete "
-               "homework or submit work automatically.")
-    with st.expander("Completed tasks"):
-        completed = [t for t in list_tasks(include_completed=True) if t["completed"]]
-        if not completed:
-            st.write("Nothing completed yet.")
-        for t in completed:
-            c1, c2 = st.columns([4, 1])
-            c1.write(t["title"])
-            if c2.button("Reopen", key="reopen_" + t["id"]):
-                update_task(t["id"], completed=False)
-                st.rerun()
+    k1, k2, k3 = st.columns(3, gap="medium")
+    with k1:
+        metric("To do", len(all_tasks), "Open assignments")
+    with k2:
+        metric("Due this week", len(next_week), "Next seven days")
+    with k3:
+        metric("Overdue", len(overdue), "Needs attention")
 
+    left, right = st.columns([3.5, 1.5], gap="large")
+    with right:
+        with st.container(border=True, key="task-add-panel"):
+            st.markdown('<div class="eyebrow">QUICK ADD</div>',
+                        unsafe_allow_html=True)
+            st.markdown("**New assignment**")
+            with st.form("new_task", clear_on_submit=True):
+                title = st.text_input(
+                    "Task", placeholder="Finish geometry homework"
+                )
+                has_due = st.checkbox("Set a due date", value=False)
+                due = st.date_input("Due date", value=today) if has_due else None
+                if st.form_submit_button(
+                    "+ Add assignment", type="primary", use_container_width=True
+                ):
+                    try:
+                        add_task(title, due=due.isoformat() if due else None)
+                        st.rerun()
+                    except ValueError as exc:
+                        st.error(str(exc))
+        st.caption("You can also add assignments by clicking a day in the calendar.")
+
+    with left:
+        filter_choice = st.selectbox(
+            "Show tasks",
+            ["All open", "Due this week", "Overdue", "No due date"],
+            index=0, label_visibility="collapsed",
+            key="task_filter",
+        )
+        if filter_choice == "Due this week":
+            visible = next_week
+        elif filter_choice == "Overdue":
+            visible = overdue
+        elif filter_choice == "No due date":
+            visible = [task for task in all_tasks if not task.get("due")]
+        else:
+            visible = all_tasks
+
+        if not visible:
+            st.info("Nothing here yet. Add an assignment using the panel.")
+
+        for task in visible[:100]:
+            with st.container(border=True, key=f"task-row-{task['id']}"):
+                info, priority = st.columns([4.7, 1.1], gap="small")
+                with info:
+                    st.markdown(
+                        '<div class="task-title">' +
+                        html.escape(task["title"]) + "</div>",
+                        unsafe_allow_html=True,
+                    )
+                    detail = []
+                    if task.get("due"):
+                        formatted = date.fromisoformat(task["due"])
+                        detail.append("Due " + formatted.strftime("%b ") + str(formatted.day))
+                    else:
+                        detail.append("No due date")
+                    if task.get("source") != "manual":
+                        detail.append(task["source"].capitalize())
+                    st.markdown(
+                        '<div class="task-meta">' +
+                        html.escape(" · ".join(detail)) + "</div>",
+                        unsafe_allow_html=True,
+                    )
+                with priority:
+                    st.markdown(
+                        '<div class="task-status">' +
+                        str(round(score_task(task) * 100)) +
+                        '% priority</div>',
+                        unsafe_allow_html=True,
+                    )
+                done_col, high_col, low_col = st.columns([1.1, 1.5, 1.7], gap="small")
+                if done_col.button("✓ Done", key="done_" + task["id"],
+                                   use_container_width=True):
+                    update_task(task["id"], completed=True)
+                    st.rerun()
+                if high_col.button("↑ Important", key="important_" + task["id"],
+                                   use_container_width=True):
+                    learn_priority(task["id"], True)
+                    st.rerun()
+                if low_col.button("↓ Not urgent", key="not_" + task["id"],
+                                  use_container_width=True):
+                    learn_priority(task["id"], False)
+                    st.rerun()
+
+        if len(visible) > 100:
+            st.caption("Showing the first 100 tasks.")
+        with st.expander("Completed assignments"):
+            completed = [
+                task for task in list_tasks(include_completed=True, limit=500)
+                if task["completed"]
+            ]
+            if not completed:
+                st.caption("No completed assignments yet.")
+            for task in completed:
+                task_col, reopen_col = st.columns([5, 1])
+                task_col.write(task["title"])
+                if reopen_col.button("Reopen", key="reopen_" + task["id"]):
+                    update_task(task["id"], completed=False)
+                    st.rerun()
 
 
 def render_calendar():
