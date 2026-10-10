@@ -42,6 +42,8 @@ def ensure_schema():
             "repeat_weekly": "INTEGER NOT NULL DEFAULT 0",
             "repeat_until": "TEXT",
             "linked_event_id": "TEXT",
+            # A school-wide Google export is NOT proof of enrollment.
+            "personal_status": "TEXT NOT NULL DEFAULT 'unverified'",
         }
         for name, decl in upgrades.items():
             if name not in existing:
@@ -168,6 +170,108 @@ def create_item(*, title, due=None, due_time=None, description="",
         )
         db.commit()
     return uid
+
+
+def is_verified_personal(item):
+    """Only explicitly accepted Google events can be called *your* classes.
+
+    Locally entered work, Winter Arc sessions, and other direct user-authorized
+    items keep working. Unverified / rejected imported Google events never
+    appear in personal schedule answers or language-model context.
+    """
+    if str(item.get("personal_status") or "") == "not_mine":
+        return False
+    if item.get("source") == "google_calendar":
+        return item.get("personal_status") == "mine"
+    return True
+
+
+def review_imported_groups(*, search="", limit=75):
+    """Group incoming Google events by source calendar + iCal UID.
+
+    Each recurrence usually expands into many instance rows sharing a UID.
+    Group by UID rather than by titles so distinct sections / teachers remain
+    separate; no personal calendar data leaves the local database.
+    """
+    ensure_schema()
+    with connect() as db:
+        imported = [
+            dict(r) for r in db.execute(
+                "SELECT id, title, due, due_time, notes, external_id, "
+                "personal_status FROM tasks "
+                "WHERE source='google_calendar' AND item_type='event' "
+                "ORDER BY due, due_time, title"
+            ).fetchall()
+        ]
+    groups = {}
+    needle = " ".join(str(search).casefold().split())
+    for item in imported:
+        text_value = (item["title"] + " " + (item.get("notes") or "")).casefold()
+        if needle and needle not in text_value:
+            continue
+        key = (item.get("external_id") or item["id"]).rsplit(":", 1)[0]
+        group = groups.get(key)
+        if group is None:
+            groups[key] = {
+                "id": item["id"],
+                "title": item["title"],
+                "first_date": item["due"],
+                "time": item.get("due_time"),
+                "notes": item.get("notes") or "",
+                "status": item.get("personal_status") or "unverified",
+                "occurrences": 1,
+            }
+        else:
+            group["occurrences"] += 1
+    return list(groups.values())[:max(1, min(limit, 1000))]
+
+
+def set_imported_personal_status(item_id, status):
+    """Mark a school calendar event and all instances with the same UID.
+
+    Explicit action only. Does not affect external Google, source records,
+    manual tasks, or unrelated class sections with different UIDs.
+    """
+    if status not in ("mine", "not_mine", "unverified"):
+        raise ValueError("Unknown confirmation status")
+    ensure_schema()
+    with connect() as db:
+        row = db.execute(
+            "SELECT external_id FROM tasks WHERE id=? "
+            "AND source='google_calendar' AND item_type='event'", (item_id,)
+        ).fetchone()
+        if row is None:
+            raise ValueError("Choose an imported calendar event")
+        identifier = str(row["external_id"] or "")
+        if not identifier:
+            ids = [item_id]
+        else:
+            series = identifier.rsplit(":", 1)[0]
+            ids = [
+                current["id"] for current in db.execute(
+                    "SELECT id, external_id FROM tasks "
+                    "WHERE source='google_calendar' AND item_type='event'"
+                ).fetchall()
+                if str(current["external_id"] or "").rsplit(":", 1)[0] == series
+            ]
+        db.executemany(
+            "UPDATE tasks SET personal_status=? WHERE id=?",
+            [(status, value) for value in ids],
+        )
+        db.commit()
+    return len(ids)
+
+
+def imported_review_counts():
+    ensure_schema()
+    with connect() as db:
+        return {
+            status: int(db.execute(
+                "SELECT COUNT(*) FROM tasks WHERE source='google_calendar' "
+                "AND item_type='event' AND personal_status=?", (status,)
+            ).fetchone()[0])
+            for status in ("unverified", "mine", "not_mine")
+        }
 
 
 def get_item(item_id):
