@@ -26,6 +26,7 @@ from training_ui import training_page
 from training_data import trained_model
 from trained_chat import inference_dependencies_ready
 from data_backup import export_personal_data, restore_personal_data
+from unicode_support import UNICODE_SAMPLES
 
 APP_BUILD = "2026.10.10-minimal-workspace"
 
@@ -94,6 +95,26 @@ def render_connections():
         "Link Gmail with read-only permission or import your school assignments. "
         "You control what AARON-1 can access.",
     )
+
+    with st.expander("Character and symbol display test"):
+        st.caption(
+            "These are actual Unicode characters, not images. Compare the "
+            "examples below with the text you see in Calendar and Chat."
+        )
+        for label, sample in UNICODE_SAMPLES:
+            st.markdown(f"**{label}:** {sample}")
+        typed = st.text_input(
+            "Type or paste Chinese and symbols here to verify input",
+            key="aaron_unicode_probe",
+            placeholder="中文 ∑ √ ✅ 🎹",
+        )
+        if typed:
+            st.write("Input received:", typed)
+        st.caption(
+            "Fonts are downloaded from Google Fonts when available. "
+            "If these still show boxes after a hard refresh, check whether "
+            "fonts.googleapis.com and fonts.gstatic.com are blocked."
+        )
 
     with st.container(border=True):
         st.markdown("### Data protection")
@@ -484,6 +505,7 @@ def _database_startup_help(exc):
 
 
 def main():
+    install_theme()
     try:
         init_chat()
         ensure_schema()
@@ -497,13 +519,14 @@ def main():
         st.error("AARON-1 couldn't open its database.")
         st.warning(_database_startup_help(exc))
         st.caption("Error category: " + type(exc).__name__)
+        st.markdown(
+            "**Character display check:** 中文 漢字 日本語 한국어 ∑ ∫ ∠ ⊥ ✅ 🎹"
+        )
         st.caption(
             "If you already downloaded an AARON-1 backup, keep that file. "
             "This error doesn't intentionally delete calendar records."
         )
         st.stop()
-
-    install_theme()
 
     # Native multi-page navigation: independent URLs and a single rendered view.
     pages = [
