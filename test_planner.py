@@ -109,6 +109,18 @@ class PlannerTests(unittest.TestCase):
         planner.toggle_complete(uid, True)
         self.assertFalse(any(x["id"] == uid for x in planner.next_actions()))
 
+    def test_priority_changes_are_learned_and_saved(self):
+        task_id = planner.create_item(
+            title="Writing practice", due="2026-10-20", priority=2
+        )
+        self.assertTrue(planner.set_priority(task_id, 4))
+        updated = planner.get_item(task_id)
+        self.assertEqual(updated["priority_level"], 4)
+        self.assertEqual(core.load_weights()[1], 1)
+        self.assertTrue(planner.set_priority(task_id, 1))
+        self.assertEqual(core.load_weights()[1], 2)
+        self.assertFalse(planner.set_priority("missing", 3))
+
     def test_priority_setting_and_validation(self):
         with self.assertRaises(ValueError):
             planner.create_item(title="Bad time", due="2026-10-10",
