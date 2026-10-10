@@ -48,7 +48,7 @@ class FullWidthCalendarTests(unittest.TestCase):
 
     def test_normal_page_uses_full_width_without_permanent_calendar_editor(self):
         from app import APP_BUILD
-        self.assertIn("popup-v6", APP_BUILD)
+        self.assertIn("calendar-chat-v7", APP_BUILD)
         from planner_ui import CALENDAR_CSS
         self.assertIn("min-height:125px", CALENDAR_CSS)
         self.assertIn("font-size:13px", CALENDAR_CSS)
@@ -86,14 +86,25 @@ class FullWidthCalendarTests(unittest.TestCase):
         ).run()
         at.button(key="calendar_planner_1_save").click().run()
         self.assertEqual(len(at.exception), 0, repr([e.message for e in at.exception]))
-        self.assertFalse(at.session_state.get("planner_popup_open"))
+        saved = [
+            x["title"] for x in planner.items_for_calendar()
+            if x["title"] == "Class: Advanced Geometry"
+        ]
+        self.assertTrue(
+            saved,
+            "Form submission did not save the event; popup state: "
+            + repr(at.session_state.get("planner_popup_open"))
+            + " and available fields: "
+            + repr([x.key for x in at.get("text_input")]),
+        )
+        self.assertFalse(
+            at.session_state.get("planner_popup_open"),
+            "Saved event still leaves the popup open: " +
+            repr([x.message for x in at.exception]),
+        )
         self.assertNotIn(
             "calendar_planner_1_title", [x.key for x in at.get("text_input")]
         )
-        self.assertTrue(any(
-            x["title"] == "Class: Advanced Geometry"
-            for x in planner.items_for_calendar()
-        ))
 
     def test_open_existing_event_from_calendar_callback_and_show_full_title(self):
         import planner_ui
