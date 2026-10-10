@@ -103,6 +103,65 @@ class UnicodePersistenceTest(unittest.TestCase):
                         self.assertEqual(row[1], SAMPLES[0])
                         self.assertEqual(dict(row)["title"], SAMPLES[0])
 
+    def test_libsql_database_url_uses_matching_driver(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            location = str(Path(tmp) / "legacy_libsql.db")
+            calls = []
+            def fake_connect(database, auth_token):
+                calls.append((database, auth_token))
+                return sqlite3.connect(location)
+            fake_driver = types.SimpleNamespace(connect=fake_connect)
+            values = {
+                "TURSO_DATABASE_URL": "libsql://sample.turso.io",
+                "TURSO_AUTH_TOKEN": "private-test-token",
+            }
+            with patch.dict(sys.modules, {"libsql": fake_driver}):
+                with patch.object(assistant_core, "_configuration_value",
+                                  side_effect=lambda name: values.get(name, "")):
+                    with connect() as db:
+                        db.execute(
+                            "INSERT INTO tasks (id,title,source,created_at) "
+                            "VALUES (?,?,?,?)",
+                            ("legacy", SAMPLES[3], "manual", "2026-10-10"),
+                        )
+                        db.commit()
+                    with connect() as db:
+                        saved = db.execute(
+                            "SELECT * FROM tasks WHERE id=?", ("legacy",)
+                        ).fetchone()
+                        self.assertEqual(saved["title"], SAMPLES[3])
+                    self.assertEqual(calls[0], (
+                        "libsql://sample.turso.io", "private-test-token"
+                    ))
+
+    def test_engine_override_selects_turso_on_libsql_scheme(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            location = str(Path(tmp) / "new_engine.db")
+            calls = []
+            def fake_connect(url, auth_token):
+                calls.append(url)
+                return sqlite3.connect(location)
+            fake_driver = types.SimpleNamespace(connect=fake_connect)
+            values = {
+                "TURSO_DATABASE_URL": "libsql://sample.turso.io",
+                "TURSO_AUTH_TOKEN": "private-test-token",
+                "TURSO_DATABASE_ENGINE": "turso",
+            }
+            with patch.dict(sys.modules, {"turso_serverless": fake_driver}):
+                with patch.object(assistant_core, "_configuration_value",
+                                  side_effect=lambda name: values.get(name, "")):
+                    with connect() as db:
+                        self.assertIsNotNone(db.execute("SELECT 1").fetchone())
+            self.assertEqual(calls, ["libsql://sample.turso.io"])
+
+    def test_recovery_does_not_echo_database_secret(self):
+        app_source = (
+            Path(__file__).resolve().parents[1] / "app.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("def _database_startup_help(exc)", app_source)
+        self.assertIn("st.stop()", app_source)
+        self.assertNotIn("st.error(str(exc))", app_source)
+
     def test_half_configured_remote_fails_closed(self):
         def secret(key):
             return {"TURSO_DATABASE_URL": "https://db.example.test"}.get(key, "")
