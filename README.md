@@ -1,17 +1,19 @@
 # 🤖 AARON-1 — your personal assistant
 
-**One assistant. Four tabs. No agent network, no LLM, no API fees.**
+**One assistant. Four tabs. No agent network or API fees. Local conversational AI is optional.**
 
 This version has replaced the sender/receiver, evolution, and sandbox-network experiments. Old experiment source files were removed. Files and checkpoints already saved on your computer under `data/` were **not deleted**; previously taught personal facts are migrated into the new task database.
 
 ## What can it actually do?
 
-- **📅 Calendar:** a monthly view of due dates with clickable days, a focused side panel, quick task creation, completed tasks, and scheduling previously undated tasks.
+- **🗓️ Planner:** an interactive FullCalendar view with **Month / Week / Day / Agenda**, clickable timed events and task deadlines, descriptions, due times, event lengths, and a quick editor. No Google Calendar account/sync is required; this is the local AARON-1 calendar, styled and operated like Google Calendar.
+- **🎯 Priorities:** "What should I do next?" ordered by the actual time due, a 1–4 priority level you set, your feedback, and estimated work time. Each task gives a readable reason, not an unexplained AI score.
+- **💬 Conversation:** talk about your day, ask what's due, or create tasks in chat. Optional **Ollama** enables much more natural, multi-turn local conversations. The pretrained Ollama model only handles language — AARON-1 owns your tasks, context and explicit actions.
 - **💬 Chat:** simple commands like `what homework is due`, `add task read chapter 3`, `check my email`, or `my favorite subject is chemistry`.
-- **✅ Tasks:** manually add, prioritize, complete, and reopen assignments. The **Important** / **Not urgent** buttons train a small personal priority model.
+- **✅ Task controls:** add, edit, prioritize, finish and reopen tasks. New entries can have descriptions, dates, clock times and effort estimates. The **Important** action also teaches the local priority model.
 - **🔗 Connect:** import school assignments from an .ics calendar export or .csv file. Optionally authorize a personal **Gmail** account using Google's own OAuth sign-in, with **read-only** Gmail access. Browse inbox subjects and snippets, search school-related email, and explicitly add a message as a task.
 
-AARON-1 **does not** have a general-purpose language model. It learns task-priority weights from your feedback, not arbitrary English or human-like reasoning. It never sends/deletes emails, logs in to Blackbaud, completes homework, edits files, or acts without approval.
+Without Ollama, AARON-1 **does not** have a general-purpose language model: its chat is based on explicit commands and rules. An optional locally running pretrained Ollama model enables more natural conversation but is not AARON-1 training a neural model from scratch. It continues learning priority weights from your feedback. It never sends/deletes emails, logs in to Blackbaud, completes homework, edits files, or acts without approval.
 
 ## Run on your Mac — one Terminal, one browser tab
 
@@ -21,11 +23,11 @@ If you've already installed AARON-1:
 cd ~/AARON-1
 git pull
 source .venv/bin/activate
-python3 -m pip install -r requirements.txt
+python3 -m pip install --upgrade -r requirements.txt
 python3 -m streamlit run app.py
 ```
 
-Refresh your existing browser tab at http://localhost:8501. The interface uses a dark, minimalist style and shows **Calendar**, **Assignments**, **Chat**, and **Connections** tabs. You no longer need to start `trainer.py`, `evolution.py`, or any other background training process. Use Ctrl+C in the existing Streamlit Terminal to stop before rerunning.
+Refresh your existing browser tab at http://localhost:8501. The interface uses a dark, minimalist style and shows **Planner**, **Priorities**, **Chat**, and **Connections** tabs. You no longer need to start `trainer.py`, `evolution.py`, or any other background training process. Use Ctrl+C in the existing Streamlit Terminal to stop before rerunning.
 
 First-time install:
 
@@ -78,4 +80,26 @@ GitHub Actions checks syntax and runs these tests on pushes. OAuth live authoriz
 
 ## UI design
 
-The dashboard uses an integrated dark visual system in `ui_theme.py` and `.streamlit/config.toml`: charcoal backgrounds, restrained violet and mint accents, compact calendar cards, a selected-day details panel, and larger readable task rows. The style change does not reset any local tasks or authentication state. The calendar and the assignment list use the same SQLite task database.
+The dashboard uses an integrated dark visual system in `ui_theme.py` and `.streamlit/config.toml`: charcoal backgrounds, restrained violet and mint accents, and a full interactive FullCalendar calendar with month/week/day/agenda modes. The style change does not reset any local tasks or authentication state. The calendar and the assignment list use the same SQLite task database.
+
+## Planner details
+
+Everything is stored in the existing `data/aaron_personal.sqlite3`. The first upgraded run adds optional columns to the task table: `due_time`, `item_type`, `duration_min`, `estimated_min`, and `priority_level`; **it never drops old tasks**. Existing imported assignments default to all-day tasks with Normal priority. Previous descriptions already in `notes` are preserved.
+
+Use **Planner** to create **Task** (due date, due time, importance, estimate) or **Event** (start time, duration). Click an existing entry to edit its title, description, date, time, priority, or length. All-day tasks are supported. Deletion requires confirming it in the editor. Completing an assignment does NOT change Blackbaud or Gmail.
+
+The **Priorities** page and **Your next moves** below the calendar rank unfinished tasks. Urgent/due-soon deadlines take precedence over low-priority distant work; AARON-1's previously trained priority scorer contributes a smaller personalization signal. This is a **heuristic/planning policy with online feedback**, not a learned prediction of how you'll perform or an autonomous homework-completion agent.
+
+**Timezones:** all saved date/time values are currently treated as the local clock time of the machine running Streamlit. This is intended for a local Mac/PC installation and does not automatically synchronize time zones across devices. No external Google Calendar sync is implemented.
+
+## Conversational AARON-1 (optional, local only)
+
+In **Chat → Conversation settings**, you can pick from installed local [Ollama](https://ollama.com/) models. This makes AARON-1 much better at actual back-and-forth dialogue and discussing the assignments it knows about. The language model receives recent conversation and a small digest of your local task priorities, through `127.0.0.1` only. It has **no Gmail or task-mutating tools**. All actual calendar updates are processed by AARON-1's verified planner code; arbitrary LLM text cannot silently write to your calendar.
+
+1. Install [Ollama](https://ollama.com/download) for macOS or Windows and start it.
+2. In a Terminal, run `ollama pull qwen2.5:3b` to download a modest open-weight conversational model.
+3. Refresh the AARON-1 browser tab and choose that model in **Chat → Conversation settings**.
+
+Without Ollama you can still ask `what should I do next?`, `what homework is due`, `what is on my schedule tomorrow`, or say `add task chemistry homework due tomorrow at 5pm`. AARON-1's fallback conversation remains limited; it doesn't pretend otherwise.
+
+**Tests:** `python3 -m unittest -v test_assistant.py test_planner.py`.
