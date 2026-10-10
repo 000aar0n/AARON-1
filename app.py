@@ -327,12 +327,26 @@ def render_chat():
             if item["role"] in ("user", "assistant"):
                 with st.chat_message(item["role"]):
                     st.markdown(item["message"])
-    prompt = st.chat_input("Message AARON-1", key="aaron_chat_prompt")
-    if prompt and prompt.strip():
+    # IME-safe composer: a normal Enter keypress must never submit a message.
+    # Chinese Pinyin/Japanese/Korean keyboards use Enter to confirm a character
+    # candidate. Streamlit's chat_input can mistake that Enter for Send.
+    # A text_area inside a form only submits when the explicit Send action is
+    # chosen (or the user intentionally uses the form-submit shortcut).
+    with st.form("aaron_chat_compose_form", clear_on_submit=True):
+        prompt = st.text_area(
+            "Your message",
+            placeholder="Message AARON-1 · 中文输入也可以",
+            height=90,
+            key="aaron_chat_composer",
+            help="Press Enter normally to compose/select Chinese characters. "
+                 "Click Send when your message is complete.",
+        )
+        submitted = st.form_submit_button("Send", type="primary")
+    if submitted and prompt.strip():
         history = messages(limit=12)
-        write_chat("user", prompt)
+        write_chat("user", prompt.strip())
         try:
-            reply = answer_with_context(prompt, history)
+            reply = answer_with_context(prompt.strip(), history)
         except (ValueError, OSError) as exc:
             reply = f"Couldn't process that request ({type(exc).__name__})."
         write_chat("assistant", reply)
