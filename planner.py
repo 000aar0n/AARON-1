@@ -695,7 +695,10 @@ def calendar_events(items, *, start=None, end=None):
                 item["id"] + "::" + day if item.get("repeat_weekly") else item["id"]
             )
             title_prefix = (
-                "✓ " if is_done else "↻ " if item.get("repeat_weekly")
+                "⚠ UNVERIFIED · "
+                if item.get("source") == "google_calendar"
+                and item.get("personal_status") != "mine"
+                else "✓ " if is_done else "↻ " if item.get("repeat_weekly")
                 else "📎 " if item.get("linked_event_id") else ""
             )
             start_at = f"{day}T{hm}:00" if hm else day
