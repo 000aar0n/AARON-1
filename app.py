@@ -67,7 +67,7 @@ def answer(message):
             recent = list_messages(search="in:inbox", max_results=6)
             if not recent:
                 return "No inbox messages matched that search."
-            return "Latest Gmail inbox subjects:\\n" + "\\n".join(
+            return "Latest Gmail inbox subjects:\n" + "\n".join(
                 f"• {item['subject']} — {item['from']}" for item in recent
             )
         except Exception:
