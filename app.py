@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import html
+import hmac
 from datetime import date, timedelta
 
 import streamlit as st
 
 from assistant_core import (
+    _configuration_value, persistent_database_configured,
     add_task, concise_reply, connect, learn_priority, list_tasks, parse_csv,
     parse_ics, ranked_tasks, score_task, update_task, load_weights,
     change_month, tasks_due_in_month, tasks_without_due_date, set_task_due_date,
@@ -24,6 +26,7 @@ from assistant_conversation import respond, local_models
 from training_ui import training_page
 from training_data import trained_model
 from trained_chat import inference_dependencies_ready
+from data_backup import export_personal_data, restore_personal_data
 
 APP_BUILD = "2026.10.10-minimal-workspace"
 
@@ -92,6 +95,57 @@ def render_connections():
         "Link Gmail with read-only permission or import your school assignments. "
         "You control what AARON-1 can access.",
     )
+
+    with st.container(border=True):
+        st.markdown("### Data protection")
+        if persistent_database_configured():
+            st.success("Persistent database configured — events and chat are stored remotely.")
+        else:
+            st.warning(
+                "Temporary local storage is in use. Streamlit Community Cloud "
+                "can erase locally saved events, tasks and chat on reboot or sleep. "
+                "Download a backup before restarting the app."
+            )
+        st.caption(
+            "Private database setup: configure TURSO_DATABASE_URL, "
+            "TURSO_AUTH_TOKEN and APP_PASSWORD in Streamlit Cloud Secrets. "
+            "Do not paste credentials into GitHub."
+        )
+        try:
+            backup = export_personal_data()
+            st.download_button(
+                "Download complete personal-data backup",
+                data=backup,
+                file_name="aaron1-personal-data.json",
+                mime="application/json",
+                use_container_width=True,
+                key="aaron_export_backup",
+            )
+        except (ValueError, OSError, RuntimeError) as exc:
+            st.error("Could not prepare data backup: " + str(exc))
+        with st.expander("Restore a saved backup"):
+            st.caption(
+                "Restores missing entries only. Existing records are not overwritten "
+                "or deleted. You can use this after switching to persistent storage."
+            )
+            restore_file = st.file_uploader(
+                "AARON-1 backup JSON", type=["json"], key="aaron_restore_json"
+            )
+            confirm = st.checkbox(
+                "I want to import missing records from this backup",
+                key="aaron_restore_confirm",
+            )
+            if st.button(
+                "Restore missing records", key="aaron_restore_button",
+                disabled=restore_file is None or not confirm,
+                use_container_width=True,
+            ):
+                try:
+                    recovered = restore_personal_data(restore_file.getvalue())
+                    st.success(f"Restored {recovered} previously missing records.")
+                    st.rerun()
+                except (ValueError, RuntimeError, OSError) as exc:
+                    st.error("Restore failed: " + str(exc))
 
     with st.container(border=True):
         st.markdown("### Gmail")
@@ -391,7 +445,31 @@ def render_planner_workspace():
         render_calendar()
 
 
+def _require_password_if_configured():
+    password = _configuration_value("APP_PASSWORD")
+    if persistent_database_configured() and not password:
+        st.error(
+            "Cloud database is configured but APP_PASSWORD is missing from "
+            "Streamlit Secrets. Add APP_PASSWORD to protect your school calendar."
+        )
+        st.stop()
+    if not password or st.session_state.get("aaron_authenticated"):
+        return
+    st.title("AARON—1")
+    st.caption("Private workspace")
+    with st.form("aaron_password_gate"):
+        entered = st.text_input("Password", type="password")
+        submitted = st.form_submit_button("Unlock")
+    if submitted:
+        if hmac.compare_digest(entered.encode("utf-8"), password.encode("utf-8")):
+            st.session_state["aaron_authenticated"] = True
+            st.rerun()
+        st.error("Incorrect password")
+    st.stop()
+
+
 def main():
+    _require_password_if_configured()
     init_chat()
     ensure_schema()
     # Only once per local database, honoring the user's Winter Arc schedule.
@@ -428,6 +506,12 @@ def main():
             st.query_params.clear()
             st.error(f"Gmail connection failed: {exc}")
 
+    if not persistent_database_configured():
+        st.warning(
+            "This app is using temporary storage. Rebooting or sleeping can erase "
+            "events and chat. Open Settings → Data protection to download a backup "
+            "and configure a persistent database."
+        )
     current_page.run()
 
     st.markdown(
