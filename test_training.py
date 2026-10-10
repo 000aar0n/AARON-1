@@ -60,6 +60,13 @@ class TrainingDataTests(unittest.TestCase):
         self.assertFalse(data.delete_example(example_id))
         self.assertEqual(data.examples(), [])
 
+    def test_reapproval_replaces_old_answer_instead_of_contradicting(self):
+        first = data.add_example("What's up?", "Hello!")
+        second = data.add_example("what's up?", "YOOO gang!")
+        self.assertEqual(first, second)
+        self.assertEqual(len(data.examples()), 1)
+        self.assertEqual(data.examples()[0]["response"], "YOOO gang!")
+
     def test_validation_and_source_restrictions(self):
         with self.assertRaises(ValueError):
             data.add_example("", "yes")
