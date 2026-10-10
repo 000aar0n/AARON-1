@@ -669,17 +669,29 @@ def normalize_as_date(value):
 
 
 def calendar_events(items, *, start=None, end=None):
-    """Materialize weekly occurrences while keeping one editable parent event."""
+    """Render real calendar times plus task pins in the all-day header.
+
+    A task with a due_time is intentionally represented *twice* in FullCalendar:
+    once as a clearly labeled all-day reminder and once as a 15-minute due
+    marker at its exact saved due_time. Both views reference ONE task row and
+    open the same editor. Classes and other timed events keep exact starts/ends.
+    Untimed tasks are shown only in the all-day header.
+    """
     items = list(items)
     output = []
     event_colors = {
         item["id"]: effective_color_name(item)
         for item in items if item.get("item_type") == "event"
     }
+    event_names = {
+        item["id"]: item["title"]
+        for item in items if item.get("item_type") == "event"
+    }
     for item in items:
         if not item.get("due"):
             continue
         kind = item.get("item_type") or "task"
+        is_task = kind == "task"
         is_done = bool(item.get("completed"))
         color_name = effective_color_name(item, event_colors)
         bg = EVENT_COLORS[color_name]
@@ -687,37 +699,86 @@ def calendar_events(items, *, start=None, end=None):
         if is_done:
             bg, fg = "#303C49", "#D2DBE6"
         hm = item.get("due_time")
+        linked_id = item.get("linked_event_id")
+        linked_name = event_names.get(linked_id)
+        if linked_id and not linked_name:
+            parent = get_item(linked_id)
+            if parent and parent.get("item_type") == "event":
+                linked_name = parent["title"]
         for occurrence in _occurrence_days(item, start=start, end=end):
             day = occurrence.isoformat()
-            calendar_id = (
+            canonical_id = (
                 item["id"] + "::" + day if item.get("repeat_weekly") else item["id"]
             )
             title_prefix = (
                 "✓ " if is_done else "↻ " if item.get("repeat_weekly")
-                else "📎 " if item.get("linked_event_id") else ""
+                else "📎 " if linked_id else ""
             )
             start_at = f"{day}T{hm}:00" if hm else day
             record = {
-                "id": calendar_id, "title": title_prefix + item["title"],
-                "start": start_at, "allDay": not bool(hm),
-                "backgroundColor": bg, "borderColor": bg,
+                "id": canonical_id,
+                "title": title_prefix + item["title"],
+                "start": start_at,
+                "allDay": not bool(hm),
+                "backgroundColor": bg,
+                "borderColor": bg,
                 "textColor": fg,
+                "classNames": (
+                    ["aaron-task-due"] if is_task and hm
+                    else ["aaron-task-pin"] if is_task
+                    else ["aaron-scheduled-event"]
+                ),
                 "extendedProps": {
                     "kind": kind, "description": item.get("notes", ""),
                     "priority": int(item.get("priority_level") or 2),
                     "completed": is_done, "color": color_name,
-                    "linkedEventId": item.get("linked_event_id"),
+                    "linkedEventId": linked_id,
+                    "linkedEventTitle": linked_name,
                     "seriesId": item["id"],
                     "occurrenceDate": day,
+                    "taskCalendarRole": (
+                        "due" if is_task and hm else "pin" if is_task else "event"
+                    ),
+                    "dueTime": hm if is_task else None,
                 },
             }
+            if is_task and hm:
+                # This is a due-time *marker*, not a study block.
+                record["title"] = (
+                    ("✓ " if is_done else "⏰ DUE · ") + item["title"]
+                )
             if item.get("event_end") and kind == "event" and not item.get("repeat_weekly"):
                 record["end"] = item["event_end"]
             elif hm:
-                minutes = (int(item.get("duration_min") or 60)
-                           if kind == "event" else 15)
+                minutes = int(item.get("duration_min") or 60) if kind == "event" else 15
                 record["end"] = (
                     datetime.fromisoformat(start_at) + timedelta(minutes=minutes)
                 ).isoformat(timespec="seconds")
             output.append(record)
+
+            if is_task and hm:
+                # Tasks with a deadline appear at the TOP *as well* as at the
+                # exact time; this does not create duplicate database tasks.
+                display_time = datetime.strptime(hm, "%H:%M").strftime(
+                    "%I:%M %p"
+                ).lstrip("0")
+                link_label = (" · " + linked_name) if linked_name else ""
+                pin = {
+                    **record,
+                    "id": item["id"] + "::top",
+                    "title": (
+                        ("✓ " if is_done else "📌 ") + item["title"]
+                        + f" · due {display_time}" + link_label
+                    ),
+                    "start": day,
+                    "allDay": True,
+                    "classNames": ["aaron-task-pin", "aaron-task-top-copy"],
+                    "extendedProps": {
+                        **record["extendedProps"],
+                        "taskCalendarRole": "pin",
+                        "canonicalId": item["id"],
+                    },
+                }
+                pin.pop("end", None)
+                output.append(pin)
     return output
