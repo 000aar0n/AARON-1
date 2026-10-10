@@ -185,13 +185,15 @@ def atomic_json(path, data):
     os.replace(tmp, path)
 
 
-def create_job(model=BASE_MODEL, epochs=3):
+def create_job(model=BASE_MODEL, epochs=3, continue_from_active=True):
     if model not in ALLOWED_BASE_MODELS:
         raise ValueError("Choose a supported model")
     if not isinstance(epochs, int) or not 1 <= epochs <= 5:
         raise ValueError("Epochs must be between 1 and 5")
     approved = examples()
     training, evaluation = training_split(approved)
+    active = trained_model() if continue_from_active else None
+    parent = (active["job_id"] if active and active["base_model"] == model else None)
     training_root()
     job_id = uuid.uuid4().hex
     # Freeze approved snapshot: deleting/correcting examples mid-training cannot
@@ -201,6 +203,7 @@ def create_job(model=BASE_MODEL, epochs=3):
     job = {
         "id": job_id, "status": "queued", "base_model": model, "epochs": epochs,
         "train_count": len(training), "eval_count": len(evaluation),
+        "parent_job_id": parent,
         "started_at": datetime.now(timezone.utc).isoformat(),
         "output": str(MODEL_HOME / job_id), "error": None,
     }
