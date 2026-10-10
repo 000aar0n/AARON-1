@@ -11,10 +11,11 @@ from streamlit_calendar import calendar
 from assistant_core import learn_priority
 from winter_arc import upcoming_workout
 from planner import (
-    PRIORITY_NAMES, all_tasks, calendar_events, clear_manually_added_tasks,
-    create_item, daily_items, delete_item, get_item, items_for_calendar,
-    manually_added_task_count, next_actions, open_tasks, toggle_complete,
-    update_item, set_priority,
+    EVENT_COLORS, PRIORITY_NAMES, all_tasks, calendar_events,
+    clear_manually_added_tasks, create_item, daily_items, delete_item,
+    effective_color_name, get_item, items_for_calendar, linkable_events,
+    manually_added_task_count, next_actions, open_tasks, related_assignments,
+    toggle_complete, update_item, set_priority,
 )
 
 CALENDAR_CSS = """
@@ -33,8 +34,25 @@ CALENDAR_CSS = """
  font-size:11px;font-weight:750;letter-spacing:.075em}
 .fc .fc-daygrid-day-number {color:#dfe4f5;font-size:13px;padding:9px}
 .fc .fc-daygrid-day.fc-day-today {background:#7166bb1a}
-.fc .fc-daygrid-event {border-radius:6px;padding:3px 5px;overflow:hidden}
-.fc .fc-event-title {font-weight:650}
+.fc .fc-daygrid-event {border-radius:6px;padding:5px 7px;min-height:29px;
+ border-left-width:4px!important;overflow:visible!important;white-space:normal!important}
+.fc .fc-event-title,.fc .fc-list-event-title {
+ font-size:12px!important;line-height:1.35!important;font-weight:760!important;
+ white-space:normal!important;overflow-wrap:anywhere!important;
+ word-break:normal!important;letter-spacing:.01em}
+.fc .fc-event-main,.fc .fc-event-main-frame {overflow:visible!important;
+ white-space:normal!important}
+.fc .fc-event-time {font-size:11px!important;font-weight:800!important;
+ white-space:nowrap!important;margin-right:4px}
+.fc .fc-timegrid-event {min-height:24px!important;border-left-width:4px!important;
+ padding:3px 5px!important}
+.fc .fc-timegrid-event .fc-event-title {
+ white-space:normal!important;overflow-wrap:anywhere!important}
+.fc .fc-daygrid-dot-event {padding:4px!important}
+.fc .fc-list-event td {padding:10px 12px!important}
+.fc .fc-list-event-title a {font-weight:760!important;white-space:normal!important}
+.fc .fc-daygrid-more-link {font-size:12px!important;font-weight:750!important}
+.fc .fc-daygrid-event .fc-event-main {white-space:normal!important}
 .fc .fc-timegrid-slot-label-cushion {color:#949fb0;font-size:11px}
 .fc .fc-timegrid-now-indicator-line {border-color:#e8a16d;border-width:2px}
 .fc .fc-timegrid-now-indicator-arrow {border-color:#e8a16d}
@@ -77,14 +95,22 @@ def _format_deadline(task):
 
 
 def _choose_item(item_id):
-    st.session_state["planner_editor_id"] = item_id
+    # Occurrences are virtual: clicking one edits its parent weekly series.
+    raw = str(item_id or "")
+    parent, separator, occurrence = raw.partition("::")
+    st.session_state["planner_editor_id"] = parent
+    st.session_state["planner_selected_occurrence"] = (
+        occurrence if separator else None
+    )
     st.session_state["planner_editor_nonce"] = (
         st.session_state.get("planner_editor_nonce", 0) + 1
     )
 
 
-def _new_item(day=None, at_time=None, kind="task"):
+def _new_item(day=None, at_time=None, kind="task", linked_event_id=None):
     st.session_state["planner_editor_id"] = None
+    st.session_state["planner_selected_occurrence"] = None
+    st.session_state["planner_new_parent"] = linked_event_id
     st.session_state["planner_editor_nonce"] = (
         st.session_state.get("planner_editor_nonce", 0) + 1
     )
@@ -108,6 +134,9 @@ def _render_editor(*, scope):
     prefix = f"{scope}_planner_{nonce}"
     name = "Edit entry" if existing else "Create an entry"
     st.markdown("#### " + name)
+    if existing and existing.get("repeat_weekly"):
+        st.info("↻ This is a weekly series. Changes here update every occurrence "
+                "in the series, not just the date you clicked.")
 
     kind_default = (existing.get("item_type") or "task") if existing else (
         st.session_state.get("planner_new_kind", "task"))
@@ -128,6 +157,13 @@ def _render_editor(*, scope):
     all_day = st.checkbox(
         "All-day / no exact time", value=default_all_day, key=f"{prefix}_allday"
     )
+    weekly = False
+    if category == "Event":
+        weekly = st.checkbox(
+            "↻ Repeat every week", value=bool(existing.get("repeat_weekly"))
+            if existing and kind_default == "event" else False,
+            key=f"{prefix}_weekly",
+        )
     with st.form(f"{prefix}_form", clear_on_submit=False):
         title = st.text_input(
             "Title", value=(existing["title"] if existing else ""),
@@ -139,6 +175,14 @@ def _render_editor(*, scope):
             placeholder="Instructions, links, things to remember…", height=95,
             key=f"{prefix}_description",
         )
+        colors = list(EVENT_COLORS)
+        previous_color = existing.get("color_name") or "Auto" if existing else "Auto"
+        color_name = st.selectbox(
+            "🎨 Calendar color", colors,
+            index=colors.index(previous_color) if previous_color in colors else 0,
+            key=f"{prefix}_color",
+            help="Automatic colors use the source (Google, Winter Arc) or task priority.",
+        )
         date_col, clock_col = st.columns(2)
         with date_col:
             selected_date = st.date_input(
@@ -149,7 +193,16 @@ def _render_editor(*, scope):
                 "Start / due time", value=initial_time, step=900,
                 disabled=all_day, key=f"{prefix}_time"
             )
+        repeat_until = None
         if category == "Event":
+            if weekly:
+                repeat_until = st.date_input(
+                    "Repeat weekly until (inclusive)",
+                    value=_safe_day(existing["repeat_until"]) if (
+                        existing and existing.get("repeat_until")
+                    ) else initial_date + timedelta(weeks=12),
+                    key=f"{prefix}_weekly_until",
+                )
             duration = st.selectbox(
                 "Length", [15, 30, 45, 60, 90, 120, 180, 240, 480],
                 index=([15, 30, 45, 60, 90, 120, 180, 240, 480].index(
@@ -162,7 +215,30 @@ def _render_editor(*, scope):
             )
             estimate = 30
             priority = 2
+            linked_event_id = None
         else:
+            options = linkable_events()
+            by_id = {event["id"]: event for event in options}
+            event_ids = [None] + list(by_id)
+            selected_parent = (
+                existing.get("linked_event_id") if existing
+                else st.session_state.get("planner_new_parent")
+            )
+            linked_event_id = st.selectbox(
+                "📎 Attach assignment to an event (optional)",
+                event_ids,
+                index=event_ids.index(selected_parent)
+                if selected_parent in event_ids else 0,
+                format_func=lambda key: (
+                    "Not attached" if key is None else (
+                        by_id[key]["title"] + " · " + (by_id[key].get("due") or "")
+                        + (" · weekly" if by_id[key].get("repeat_weekly") else "")
+                    )
+                ),
+                key=f"{prefix}_linked_event",
+                help="Link a homework assignment to a class or weekly event. "
+                     "The assignment keeps its own due date and priority.",
+            )
             priority = st.select_slider(
                 "Priority",
                 options=[1, 2, 3, 4], value=chosen_priority,
@@ -192,6 +268,8 @@ def _render_editor(*, scope):
             due_time=None if all_day else selected_time.strftime("%H:%M"),
             item_type="event" if category == "Event" else "task",
             priority=priority, duration_min=duration, estimated_min=estimate,
+            color_name=color_name, repeat_weekly=weekly,
+            repeat_until=repeat_until, linked_event_id=linked_event_id,
         )
         try:
             if existing:
@@ -207,6 +285,33 @@ def _render_editor(*, scope):
             st.error(str(exc))
 
     if existing:
+        if (existing.get("item_type") or "task") == "task" and existing.get("linked_event_id"):
+            parent = get_item(existing["linked_event_id"])
+            if parent:
+                st.caption("📎 Attached to: " + parent["title"])
+        if (existing.get("item_type") or "task") == "event":
+            related = related_assignments(existing["id"])
+            st.markdown("##### 📎 Assignments linked to this event")
+            if not related:
+                st.caption("No assignments attached yet.")
+            for linked_task in related:
+                one, two = st.columns([3, 1])
+                one.caption(
+                    ("✓ " if linked_task.get("completed") else "") +
+                    linked_task["title"] + " · " + _format_deadline(linked_task)
+                )
+                if two.button(
+                    "Edit", key=f"{prefix}_linked_edit_{linked_task['id']}"
+                ):
+                    _choose_item(linked_task["id"])
+                    st.rerun()
+            if st.button(
+                "+ Add assignment to this event",
+                key=f"{prefix}_create_attached",
+                use_container_width=True,
+            ):
+                _new_item(kind="task", linked_event_id=existing["id"])
+                st.rerun()
         b1, b2 = st.columns(2, gap="small")
         if existing.get("item_type", "task") == "task":
             if b1.button(
@@ -286,6 +391,9 @@ def calendar_page():
             )
     today_items = daily_items(today)
     all_open = open_tasks()
+    st.caption("🎨 Color key: Blue · Google Calendar | Green · Winter Arc | "
+               "Teal · Events | Purple / Orange / Red · Assignment priority. "
+               "Change an item's color in its editor.")
     a, b, c = st.columns(3)
     with a:
         metric("Open tasks", len(all_open), "Across your schedule")
@@ -297,7 +405,13 @@ def calendar_page():
 
     left, right = st.columns([3.65, 1.35], gap="large")
     with left:
-        all_events = calendar_events(items_for_calendar())
+        # Recurrence expands into occurrences only for this supported display span.
+        range_start = today - timedelta(days=365)
+        range_end = today + timedelta(days=730)
+        all_events = calendar_events(
+            items_for_calendar(start=range_start, end=range_end),
+            start=range_start, end=range_end,
+        )
         options = {
             "initialView": "timeGridWeek",
             "headerToolbar": {
@@ -340,8 +454,9 @@ def calendar_page():
                 clicked = result.get("eventClick") or {}
                 event = clicked.get("event") or {}
                 item_id = str(event.get("id") or "")
-                if item_id and get_item(item_id):
-                    if st.session_state.get("planner_editor_id") != item_id:
+                series_id = item_id.split("::", 1)[0]
+                if series_id and get_item(series_id):
+                    if st.session_state.get("planner_editor_id") != series_id:
                         _choose_item(item_id)
             elif callback in ("dateClick", "select"):
                 details = result.get(callback) or {}
@@ -353,9 +468,9 @@ def calendar_page():
                     if st.session_state.get("planner_last_click") != signature:
                         st.session_state["planner_last_click"] = signature
                         _new_item(day=clicked_day, at_time=clock)
-        st.caption("Click any date to create something; click an event or task to edit it. "
-                   "Use Month / Week / Day / Agenda to switch views. Times are shown "
-                   "in your browser's local timezone.")
+        st.caption("Click a date to create an item; click an event to edit it. "
+                   "Weekly events share one editable series. Assignment links "
+                   "appear in the event editor. Use Month / Week / Day / Agenda.")
         st.markdown("#### Your next moves")
         _action_list(limit=4, scope="calendar")
 
