@@ -23,7 +23,9 @@ html,body,[data-testid="stAppViewContainer"],[data-testid="stMain"] {
   /* Browser-native CJK fallbacks: no font uploads or server dependencies. */
   font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",
     "PingFang SC","Hiragino Sans GB","Microsoft YaHei",
-    "Noto Sans CJK SC","Noto Sans SC","WenQuanYi Micro Hei",sans-serif;
+    "Noto Sans CJK SC","Noto Sans SC","WenQuanYi Micro Hei","Segoe UI Symbol",
+    "Noto Sans Symbols 2","Noto Sans Math","Apple Color Emoji",
+    "Segoe UI Emoji","Noto Color Emoji",sans-serif;
 }
 [data-testid="stHeader"]{background:transparent!important}
 [data-testid="stMainBlockContainer"] {
@@ -77,7 +79,9 @@ button,button[kind],button[data-baseweb],input,textarea,select,
 [data-testid="stForm"]{
   font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",
     "PingFang SC","Hiragino Sans GB","Microsoft YaHei",
-    "Noto Sans CJK SC","Noto Sans SC","WenQuanYi Micro Hei",sans-serif!important;
+    "Noto Sans CJK SC","Noto Sans SC","WenQuanYi Micro Hei","Segoe UI Symbol",
+    "Noto Sans Symbols 2","Noto Sans Math","Apple Color Emoji",
+    "Segoe UI Emoji","Noto Color Emoji",sans-serif!important;
 }
 div[data-testid="stButton"]>button,
 div[data-testid="stFormSubmitButton"]>button,

@@ -13,7 +13,11 @@ jobs:
         with:
           python-version: "3.12"
       - name: Check Python syntax
-        run: python -m compileall -q app.py ui_theme.py planner_ui.py training_ui.py assistant_conversation.py
+        run: python -m compileall -q app.py ui_theme.py planner_ui.py training_ui.py assistant_conversation.py data_backup.py assistant_core.py
+      - name: Install persistent database driver
+        run: python -m pip install "turso-serverless==0.1.0"
+      - name: Unicode and durable storage regression tests
+        run: python -m unittest discover -s tests -p "test_unicode_persistence.py"
       - name: Chinese Unicode and IME regression tests
         run: python -m unittest discover -s tests -p "test_chinese_support.py"
       - name: Calendar navigation regression tests

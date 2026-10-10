@@ -26,6 +26,90 @@ BASE_WEIGHTS = [0.1, 2.3, 1.5, 0.6, 0.7, 0.4, 1.1]
 FEATURES = ("bias", "overdue", "due_today", "due_week", "school", "inbox", "starred")
 
 
+def _configuration_value(name):
+    """Read DB credentials without ever logging or checking them into Git."""
+    value = os.environ.get(name, "").strip()
+    if value:
+        return value
+    try:
+        import streamlit as st
+        return str(st.secrets.get(name, "") or "").strip()
+    except (ImportError, FileNotFoundError, KeyError, OSError):
+        return ""
+
+
+def persistent_database_configured():
+    """Cloud-backed SQLite is opt-in; local SQLite stays the dev default."""
+    return bool(_configuration_value("TURSO_DATABASE_URL")
+                and _configuration_value("TURSO_AUTH_TOKEN"))
+
+
+class _MappingRow:
+    """Remote DB-API row supporting both row[0] and row['title'] / dict(row)."""
+    __slots__ = ("_fields", "_values")
+
+    def __init__(self, cursor, values):
+        self._fields = tuple(col[0] for col in cursor.description)
+        self._values = tuple(values)
+
+    def keys(self):
+        return list(self._fields)
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return self._values[key]
+        return self._values[self._fields.index(key)]
+
+    def __iter__(self):
+        return iter(self._values)
+
+    def __len__(self):
+        return len(self._values)
+
+
+class _RemoteClosingConnection:
+    """Ensure remote transactions are committed/rolled back and then closed."""
+    def __init__(self, connection):
+        self._connection = connection
+
+    def __getattr__(self, attribute):
+        return getattr(self._connection, attribute)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exception_type, exception, traceback):
+        try:
+            if exception_type:
+                self._connection.rollback()
+            else:
+                self._connection.commit()
+        finally:
+            self._connection.close()
+        return False
+
+
+def _open_app_db():
+    url = _configuration_value("TURSO_DATABASE_URL")
+    token = _configuration_value("TURSO_AUTH_TOKEN")
+    if bool(url) != bool(token):
+        raise RuntimeError(
+            "Persistent database configuration is incomplete: set BOTH "
+            "TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in Streamlit Secrets."
+        )
+    if url:
+        # Never fall back silently to ephemeral storage on a network failure.
+        # Data must be saved to the remote primary before we claim success.
+        import turso_serverless
+        raw = turso_serverless.connect(url, auth_token=token)
+        raw.row_factory = _MappingRow
+        return _RemoteClosingConnection(raw)
+    DATA.mkdir(parents=True, exist_ok=True)
+    raw = sqlite3.connect(DB, timeout=10, factory=ClosingConnection)
+    raw.row_factory = sqlite3.Row
+    return raw
+
+
 class ClosingConnection(sqlite3.Connection):
     """Close SQLite handles when leaving with-connect(), on every platform.
 
@@ -43,9 +127,7 @@ class ClosingConnection(sqlite3.Connection):
 
 
 def connect():
-    DATA.mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(DB, timeout=10, factory=ClosingConnection)
-    db.row_factory = sqlite3.Row
+    db = _open_app_db()
     db.execute("""CREATE TABLE IF NOT EXISTS tasks (
       id TEXT PRIMARY KEY, title TEXT NOT NULL, due TEXT, notes TEXT,
       source TEXT NOT NULL DEFAULT 'manual', external_id TEXT,
