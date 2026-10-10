@@ -77,6 +77,24 @@ class FullWidthCalendarTests(unittest.TestCase):
             "calendar_planner_1_title", [widget.key for widget in at.get("text_input")]
         )
 
+    def test_create_event_in_popup_saves_and_closes_without_sidebar(self):
+        at = self._app()
+        at.button(key="planner_new_event").click().run()
+        self.assertEqual(len(at.exception), 0)
+        at.text_input(key="calendar_planner_1_title").set_value(
+            "Class: Advanced Geometry"
+        ).run()
+        at.button(key="calendar_planner_1_save").click().run()
+        self.assertEqual(len(at.exception), 0, repr([e.message for e in at.exception]))
+        self.assertFalse(at.session_state.get("planner_popup_open"))
+        self.assertNotIn(
+            "calendar_planner_1_title", [x.key for x in at.get("text_input")]
+        )
+        self.assertTrue(any(
+            x["title"] == "Class: Advanced Geometry"
+            for x in planner.items_for_calendar()
+        ))
+
     def test_open_existing_event_from_calendar_callback_and_show_full_title(self):
         import planner_ui
         long_title = "Mathematics Class " + ("Very long event title " * 6)
