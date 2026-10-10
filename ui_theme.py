@@ -124,6 +124,31 @@ div[data-testid="stTextArea"] textarea {
 }
 [data-testid="stTabs"] [data-baseweb="tab-highlight"],
 [data-testid="stTabs"] [data-baseweb="tab-border"]{display:none!important;}
+/* Full-title weekly agenda: never truncate a class name. */
+[class*="st-key-planner_read_full_"] button {
+  width:100%!important;
+  height:auto!important;
+  min-height:42px!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere!important;
+  word-break:normal!important;
+  line-height:1.45!important;
+  text-align:left!important;
+  justify-content:flex-start!important;
+  padding:9px 12px!important;
+  font-size:14px!important;
+  font-weight:740!important;
+}
+[class*="st-key-planner_read_full_"] button p {
+  white-space:normal!important;
+  overflow-wrap:anywhere!important;
+  word-break:normal!important;
+  line-height:1.45!important;
+  text-align:left!important;
+}
+[class*="st-key-planner_readable_titles_window"] {
+  background:#101722!important;
+}
 [data-testid="stChatMessage"]{
   background:var(--a-panel)!important;
   border:1px solid var(--a-border)!important;
