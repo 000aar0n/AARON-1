@@ -2,13 +2,12 @@
 from __future__ import annotations
 
 import html
-import hmac
 from datetime import date, timedelta
 
 import streamlit as st
 
 from assistant_core import (
-    _configuration_value, persistent_database_configured,
+    persistent_database_configured,
     add_task, concise_reply, connect, learn_priority, list_tasks, parse_csv,
     parse_ics, ranked_tasks, score_task, update_task, load_weights,
     change_month, tasks_due_in_month, tasks_without_due_date, set_task_due_date,
@@ -108,7 +107,7 @@ def render_connections():
             )
         st.caption(
             "Private database setup: configure TURSO_DATABASE_URL, "
-            "TURSO_AUTH_TOKEN and APP_PASSWORD in Streamlit Cloud Secrets. "
+            "and TURSO_AUTH_TOKEN in Streamlit Cloud Secrets. "
             "Do not paste credentials into GitHub."
         )
         try:
@@ -445,31 +444,7 @@ def render_planner_workspace():
         render_calendar()
 
 
-def _require_password_if_configured():
-    password = _configuration_value("APP_PASSWORD")
-    if persistent_database_configured() and not password:
-        st.error(
-            "Cloud database is configured but APP_PASSWORD is missing from "
-            "Streamlit Secrets. Add APP_PASSWORD to protect your school calendar."
-        )
-        st.stop()
-    if not password or st.session_state.get("aaron_authenticated"):
-        return
-    st.title("AARON—1")
-    st.caption("Private workspace")
-    with st.form("aaron_password_gate"):
-        entered = st.text_input("Password", type="password")
-        submitted = st.form_submit_button("Unlock")
-    if submitted:
-        if hmac.compare_digest(entered.encode("utf-8"), password.encode("utf-8")):
-            st.session_state["aaron_authenticated"] = True
-            st.rerun()
-        st.error("Incorrect password")
-    st.stop()
-
-
 def main():
-    _require_password_if_configured()
     init_chat()
     ensure_schema()
     # Only once per local database, honoring the user's Winter Arc schedule.
