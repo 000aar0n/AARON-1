@@ -24,7 +24,9 @@ CALENDAR_CSS = """
      --fc-neutral-bg-color:#171e2a; --fc-today-bg-color:#7361c11a;
      color:#e5e8f1; font-family:Inter,system-ui,"PingFang SC",
      "Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",
-     "Noto Sans SC","WenQuanYi Micro Hei",sans-serif}
+     "Noto Sans SC","WenQuanYi Micro Hei","Segoe UI Symbol",
+    "Noto Sans Symbols 2","Noto Sans Math","Apple Color Emoji",
+    "Segoe UI Emoji","Noto Color Emoji",sans-serif}
 .fc .fc-toolbar {margin-bottom:20px}
 .fc .fc-toolbar-title {font-size:1.35rem;font-weight:740;letter-spacing:-.035em;color:#f5f6ff}
 .fc .fc-button-primary {background:#262e40;border-color:#404b63;
