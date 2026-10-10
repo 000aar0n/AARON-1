@@ -20,7 +20,10 @@ STYLE = r"""
 }
 html,body,[data-testid="stAppViewContainer"],[data-testid="stMain"] {
   background:var(--a-bg)!important;color:var(--a-text)!important;
-  font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  /* Browser-native CJK fallbacks: no font uploads or server dependencies. */
+  font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",
+    "PingFang SC","Hiragino Sans GB","Microsoft YaHei",
+    "Noto Sans CJK SC","Noto Sans SC","WenQuanYi Micro Hei",sans-serif;
 }
 [data-testid="stHeader"]{background:transparent!important}
 [data-testid="stMainBlockContainer"] {
@@ -68,8 +71,13 @@ div[data-testid="stVerticalBlock"]{gap:.65rem}
   border-radius:4px!important;
   background:var(--a-panel)!important;
 }
-button,button[kind],button[data-baseweb],input,textarea,select{
-  font-family:inherit!important;
+button,button[kind],button[data-baseweb],input,textarea,select,
+[data-testid="stMarkdownContainer"],[data-testid="stChatMessage"],
+[data-testid="stTextArea"],[data-testid="stTextInput"],
+[data-testid="stForm"]{
+  font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",
+    "PingFang SC","Hiragino Sans GB","Microsoft YaHei",
+    "Noto Sans CJK SC","Noto Sans SC","WenQuanYi Micro Hei",sans-serif!important;
 }
 div[data-testid="stButton"]>button,
 div[data-testid="stFormSubmitButton"]>button,
