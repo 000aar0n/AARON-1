@@ -78,6 +78,52 @@ class AssistantTests(unittest.TestCase):
         self.assertEqual(core.recall("favorite subject"), "chemistry")
         self.assertIn("chemistry", core.concise_reply("what is my favorite subject"))
 
+
+    def test_calendar_month_bounds_and_year_navigation(self):
+        self.assertEqual(core.change_month(date(2026, 1, 1), -1),
+                         date(2025, 12, 1))
+        self.assertEqual(core.change_month(date(2026, 12, 1), 1),
+                         date(2027, 1, 1))
+        self.assertEqual(core.month_bounds(2028, 2),
+                         (date(2028, 2, 1), date(2028, 3, 1)))
+
+    def test_calendar_queries_only_selected_month(self):
+        core.add_task("October chemistry", "2026-10-09")
+        core.add_task("End of October", "2026-10-31")
+        core.add_task("November geometry", "2026-11-01")
+        core.add_task("September reading", "2026-09-30")
+        core.add_task("Unscheduled")
+
+        october = core.tasks_due_in_month(2026, 10)
+        self.assertEqual({task["title"] for task in october},
+                         {"October chemistry", "End of October"})
+        self.assertEqual(len(core.tasks_due_in_month(2026, 11)), 1)
+        self.assertEqual(len(core.tasks_without_due_date()), 1)
+
+    def test_calendar_done_reopen_and_schedule(self):
+        task_id, _ = core.add_task("Algebra practice", "2026-10-22")
+        self.assertTrue(core.update_task(task_id, completed=True))
+        self.assertEqual(len(core.tasks_due_in_month(2026, 10)), 1)
+        self.assertEqual(len(core.tasks_due_in_month(2026, 10, include_completed=False)), 0)
+        self.assertTrue(core.update_task(task_id, completed=False))
+        self.assertEqual(len(core.tasks_due_in_month(2026, 10, include_completed=False)), 1)
+        self.assertTrue(core.set_task_due_date(task_id, "2026-11-04"))
+        self.assertEqual(len(core.tasks_due_in_month(2026, 10)), 0)
+        self.assertEqual(core.tasks_due_in_month(2026, 11)[0]["due"], "2026-11-04")
+        with self.assertRaises(ValueError):
+            core.set_task_due_date(task_id, "tomorrow")
+
+    def test_calendar_displays_imported_school_assignments(self):
+        ics = (b"BEGIN:VCALENDAR\\r\\nVERSION:2.0\\r\\n"
+               b"BEGIN:VEVENT\\r\\nUID:science-test\\r\\n"
+               b"DTSTART;VALUE=DATE:20261020\\r\\n"
+               b"SUMMARY:Science test\\r\\nEND:VEVENT\\r\\nEND:VCALENDAR\\r\\n")
+        self.assertEqual(core.parse_ics(ics), 1)
+        october = core.tasks_due_in_month(2026, 10)
+        self.assertEqual(len(october), 1)
+        self.assertEqual(october[0]["source"], "blackbaud")
+        self.assertEqual(october[0]["due"], "2026-10-20")
+
     def test_seed_is_available(self):
         self.assertEqual(len(core.load_weights()[0]), len(core.FEATURES))
 
