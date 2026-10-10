@@ -213,6 +213,18 @@ def respond(message, previous=(), model=None, now=None):
             entries.sort(key=lambda t: (t["due"], t.get("due_time") or ""))
             return (_task_summary(entries, "the next seven days"), False)
 
+    if any(phrase in lower for phrase in (
+        "what homework is due", "what's due", "what is due",
+        "show my assignments", "show my homework", "upcoming deadlines",
+        "what assignments do i have", "show my tasks",
+    )):
+        return (_priority_reply(), False)
+
+    if any(phrase in lower for phrase in (
+        "my schedule", "my calendar", "my day", "today's plan",
+    )) and not agenda:
+        return (_task_summary(daily_items(now.date()), "today"), False)
+
     if any(phrase in lower for phrase in ("all my tasks", "list my tasks",
                                          "my assignments", "unfinished tasks")):
         return (_priority_reply(), False)
