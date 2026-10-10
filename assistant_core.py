@@ -98,10 +98,22 @@ def _open_app_db():
             "TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in Streamlit Secrets."
         )
     if url:
-        # Never fall back silently to ephemeral storage on a network failure.
-        # Data must be saved to the remote primary before we claim success.
-        import turso_serverless
-        raw = turso_serverless.connect(url, auth_token=token)
+        # Choose the official Python driver for the Turso engine in use.
+        # Older dashboards and CLI defaults create libSQL databases, while
+        # `turso db create ... --tursodb` creates the newer Turso engine.
+        # A libsql:// URL normally identifies the older engine.
+        engine = _configuration_value("TURSO_DATABASE_ENGINE").lower()
+        if engine not in ("", "libsql", "turso"):
+            raise ValueError(
+                "TURSO_DATABASE_ENGINE must be either 'turso' or 'libsql'"
+            )
+        if engine == "libsql" or (not engine and url.startswith("libsql://")):
+            import libsql
+            raw = libsql.connect(database=url, auth_token=token)
+        else:
+            import turso_serverless
+            raw = turso_serverless.connect(url, auth_token=token)
+        # Never silently use temporary SQLite on a remote connection failure.
         raw.row_factory = _MappingRow
         return _RemoteClosingConnection(raw)
     DATA.mkdir(parents=True, exist_ok=True)

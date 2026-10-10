@@ -10,3 +10,5 @@ tzdata>=2025.2
 
 # SQLite-compatible remote datastore (required only when Turso secrets are set).
 turso-serverless==0.1.0
+# Native libSQL DB-API driver for older Turso libSQL databases.
+libsql>=0.1,<1

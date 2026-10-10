@@ -107,8 +107,9 @@ def render_connections():
             )
         st.caption(
             "Database setup: configure TURSO_DATABASE_URL and "
-            "TURSO_AUTH_TOKEN in Streamlit Cloud Secrets. "
-            "Keep the Streamlit app private and never commit credentials to GitHub."
+            "TURSO_AUTH_TOKEN in Streamlit Cloud Secrets. If necessary, set "
+            "TURSO_DATABASE_ENGINE to 'libsql' or 'turso' for your database "
+            "type. Keep the app private and never commit credentials to GitHub."
         )
         try:
             backup = export_personal_data()
@@ -121,7 +122,8 @@ def render_connections():
                 key="aaron_export_backup",
             )
         except (ValueError, OSError, RuntimeError) as exc:
-            st.error("Could not prepare data backup: " + str(exc))
+            st.error("Could not prepare data backup.")
+            st.info(_database_startup_help(exc))
         with st.expander("Restore a saved backup"):
             st.caption(
                 "Restores missing entries only. Existing records are not overwritten "
@@ -144,7 +146,8 @@ def render_connections():
                     st.success(f"Restored {recovered} previously missing records.")
                     st.rerun()
                 except (ValueError, RuntimeError, OSError) as exc:
-                    st.error("Restore failed: " + str(exc))
+                    st.error("Restore failed; no existing rows were intentionally removed.")
+                    st.info(_database_startup_help(exc))
 
     with st.container(border=True):
         st.markdown("### Gmail")
@@ -444,13 +447,61 @@ def render_planner_workspace():
         render_calendar()
 
 
+def _database_startup_help(exc):
+    """Safe errors that never echo a private URL, token or exception payload."""
+    raw = str(exc).lower()
+    if ("401" in raw or "403" in raw or "unauthorized" in raw
+            or "forbidden" in raw or "authentication" in raw):
+        return (
+            "Turso rejected the connection. In Streamlit Cloud → Settings → "
+            "Secrets, verify TURSO_AUTH_TOKEN belongs to your aaron-1 database. "
+            "Do not paste the token into chat or GitHub."
+        )
+    if ("404" in raw or "not found" in raw
+            or "unsupported protocol" in raw or "pipeline" in raw):
+        return (
+            "The database endpoint may use the other Turso engine. In Secrets, "
+            "try TURSO_DATABASE_ENGINE = 'libsql' for an older libSQL database, "
+            "or TURSO_DATABASE_ENGINE = 'turso' for the newer Turso engine. "
+            "Check that TURSO_DATABASE_URL is the full database URL."
+        )
+    if "configuration is incomplete" in raw:
+        return (
+            "Both TURSO_DATABASE_URL and TURSO_AUTH_TOKEN must be present in "
+            "Streamlit Cloud → Settings → Secrets."
+        )
+    if ("timeout" in raw or "timed out" in raw
+            or "dns" in raw or "connect" in raw):
+        return (
+            "The remote database isn't reachable. Double-check the full "
+            "TURSO_DATABASE_URL, then restart the app."
+        )
+    return (
+        "Check Streamlit Cloud → Manage app → Logs for the Python error. "
+        "Verify the Turso URL, token, and optional TURSO_DATABASE_ENGINE secret. "
+        "The app will not switch to temporary local storage behind your back."
+    )
+
+
 def main():
-    init_chat()
-    ensure_schema()
-    # Only once per local database, honoring the user's Winter Arc schedule.
-    seed_winter_arc()
-    from assistant_core import migrate_legacy_facts
-    migrate_legacy_facts()
+    try:
+        init_chat()
+        ensure_schema()
+        # Seed once in the configured database, not on every app rerun.
+        seed_winter_arc()
+        from assistant_core import migrate_legacy_facts
+        migrate_legacy_facts()
+    except Exception as exc:
+        # Show a recovery screen instead of Streamlit's generic traceback.
+        # Never print exception text: SDK exceptions may include database URLs.
+        st.error("AARON-1 couldn't open its database.")
+        st.warning(_database_startup_help(exc))
+        st.caption("Error category: " + type(exc).__name__)
+        st.caption(
+            "If you already downloaded an AARON-1 backup, keep that file. "
+            "This error doesn't intentionally delete calendar records."
+        )
+        st.stop()
 
     install_theme()
 
@@ -467,8 +518,12 @@ def main():
     with st.sidebar:
         st.divider()
         st.caption("AARON—1")
-        st.caption("Storage on this Render service is temporary.")
-        st.caption("Back up your calendar before any deployment.")
+        st.caption(
+            "Turso data is persistent when the remote database is connected."
+            if persistent_database_configured()
+            else "Local storage is temporary on cloud hosts."
+        )
+        st.caption("Back up your calendar before major changes.")
 
     header()
     # OAuth callbacks return to the root, independent of the active page.
