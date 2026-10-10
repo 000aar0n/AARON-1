@@ -81,10 +81,13 @@ class FullWidthCalendarTests(unittest.TestCase):
         at = self._app()
         at.button(key="planner_new_event").click().run()
         self.assertEqual(len(at.exception), 0)
+        # A Streamlit form submits all its input changes as one transaction.
+        # Don't rerun between typing and clicking Submit in AppTest.
         at.text_input(key="calendar_planner_1_title").set_value(
             "Class: Advanced Geometry"
-        ).run()
-        at.button(key="calendar_planner_1_save").click().run()
+        )
+        at.button(key="calendar_planner_1_save").click()
+        at.run()
         self.assertEqual(len(at.exception), 0, repr([e.message for e in at.exception]))
         saved = [
             x["title"] for x in planner.items_for_calendar()
