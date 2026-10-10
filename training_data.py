@@ -230,9 +230,7 @@ def read_job(job_id):
 def recent_jobs(limit=10):
     JOB_HOME.mkdir(parents=True, exist_ok=True)
     jobs = []
-    for path in sorted(JOB_HOME.glob("*.json"), reverse=True):
-        if len(jobs) >= limit:
-            break
+    for path in JOB_HOME.glob("*.json"):
         if not re.fullmatch(r"[a-f0-9]{32}\.json", path.name):
             continue
         try:
