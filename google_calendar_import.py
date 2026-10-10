@@ -316,6 +316,19 @@ def import_google_calendar(payload, filename, *, from_date=None, months=18):
     created, refreshed, deleted = 0, 0, 0
     # One transaction: either the entire calendar import succeeds or none.
     with connect() as db:
+        # A confirmed/rejected recurring class keeps its status when a
+        # subsequent ICS import introduces new occurrences of the same UID.
+        # This never infers enrollment from title/teacher similarities.
+        known_status = {
+            str(r["external_id"]).rsplit(":", 1)[0]: r["personal_status"]
+            for r in db.execute(
+                "SELECT external_id, personal_status FROM tasks "
+                "WHERE source=? AND item_type='event' "
+                "AND personal_status IN ('mine','not_mine') "
+                "AND external_id IS NOT NULL",
+                (CALENDAR_SOURCE,),
+            ).fetchall()
+        }
         for key in removed:
             # A cancelled imported event must not delete its attached homework.
             # Detach local assignments first, then remove only the event copy.
@@ -348,12 +361,13 @@ def import_google_calendar(payload, filename, *, from_date=None, months=18):
                     """INSERT INTO tasks
                       (id,title,due,due_time,notes,source,external_id,
                        created_at,item_type,duration_min,estimated_min,
-                       priority_level,event_end)
-                      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                       priority_level,event_end,personal_status)
+                      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (str(uuid.uuid4()), item["title"], item["due"],
                      item["due_time"], item["notes"], CALENDAR_SOURCE, key,
                      datetime.now(timezone.utc).isoformat(), "event",
-                     item["duration_min"], 30, 2, item["event_end"]),
+                     item["duration_min"], 30, 2, item["event_end"],
+                     known_status.get(key.rsplit(":", 1)[0], "unverified")),
                 )
                 created += 1
         db.commit()
