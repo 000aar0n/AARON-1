@@ -143,6 +143,9 @@ def _read_calendar_question(lower, today):
         "what is my schedule", "what's my calendar",
         "what is my calendar", "what's my class schedule",
         "show me my calendar", "show my calendar",
+        "what classes am i taking", "what classes am i in",
+        "which classes am i in", "which classes do i take",
+        "what classes do i take", "list my classes", "my classes",
     )) and not any(name in lower for name in WEEKDAYS + ("today", "tomorrow")):
         rows = schedule_for_range(today, today + timedelta(days=7))
         return format_schedule(rows, "the next seven days")
@@ -171,9 +174,11 @@ def _read_calendar_question(lower, today):
                 matches[:5], "upcoming " + name, max_events=5
             )
         return (
-            "I couldn't find an upcoming **" + name +
-            "** on your local calendar. Check Planner or import the class "
-            "from Connections → Google Calendar."
+            "I have **no verified upcoming **" + name +
+            "** class/event on your personal schedule. "
+            "A school-wide import is not proof that you're enrolled. "
+            "Use Planner → Review imported classes to confirm your own; "
+            "I won't invent a class time."
         )
     return None
 
