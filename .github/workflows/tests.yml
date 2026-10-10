@@ -1,7 +1,7 @@
 name: Verify AARON-1
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, 'fix/full-app-task-cleanup']
   workflow_dispatch:
 
 permissions:
@@ -18,6 +18,6 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
       - name: Check Python syntax
-        run: python -m compileall -q app.py assistant_core.py gmail_access.py avatar.py test_assistant.py planner.py planner_ui.py assistant_conversation.py test_planner.py training_data.py training_ui.py train_aaron.py trained_chat.py test_training.py test_planner_widgets.py
+        run: python -m compileall -q app.py assistant_core.py gmail_access.py avatar.py test_assistant.py planner.py planner_ui.py assistant_conversation.py test_planner.py training_data.py training_ui.py train_aaron.py trained_chat.py test_training.py test_planner_widgets.py clear_my_tasks.py test_task_cleanup.py
       - name: Run offline regression tests
-        run: python -m unittest -v test_assistant.py test_planner.py test_training.py test_planner_widgets.py
+        run: python -m unittest -v test_assistant.py test_planner.py test_training.py test_planner_widgets.py test_task_cleanup.py
