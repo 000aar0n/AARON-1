@@ -17,6 +17,15 @@ from assistant_core import connect, score_task, learn_priority
 PRIORITY_NAMES = {1: "Low", 2: "Normal", 3: "High", 4: "Urgent"}
 KINDS = ("task", "event")
 
+# Consistent high-contrast colors for readable calendar event labels.
+EVENT_COLORS = {
+    "Auto": None, "Blue": "#215AAB", "Purple": "#6246AE",
+    "Teal": "#126B71", "Green": "#396D35", "Orange": "#965013",
+    "Pink": "#9B356C", "Red": "#9C3545", "Slate": "#425269",
+}
+AUTO_PRIORITY_COLORS = {1: "Slate", 2: "Purple", 3: "Orange", 4: "Red"}
+
+
 
 def ensure_schema():
     """Idempotent migration for existing users; never drops or resets data."""
@@ -29,11 +38,16 @@ def ensure_schema():
             "priority_level": "INTEGER NOT NULL DEFAULT 2",
             "item_type": "TEXT NOT NULL DEFAULT 'task'",
             "event_end": "TEXT",
+            "color_name": "TEXT NOT NULL DEFAULT 'Auto'",
+            "repeat_weekly": "INTEGER NOT NULL DEFAULT 0",
+            "repeat_until": "TEXT",
+            "linked_event_id": "TEXT",
         }
         for name, decl in upgrades.items():
             if name not in existing:
                 db.execute(f"ALTER TABLE tasks ADD COLUMN {name} {decl}")
         db.execute("CREATE INDEX IF NOT EXISTS idx_planner_due ON tasks(due, due_time)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_linked_assignments ON tasks(linked_event_id)")
         db.commit()
 
 
@@ -64,7 +78,8 @@ def normalize_time(value):
 
 
 def validate_fields(*, title, due, due_time, description, item_type, priority,
-                    duration_min, estimated_min):
+                    duration_min, estimated_min, color_name="Auto",
+                    repeat_weekly=False, repeat_until=None, linked_event_id=None):
     title = str(title).strip()
     if not title or len(title) > 250:
         raise ValueError("Title must contain 1–250 characters")
@@ -87,31 +102,67 @@ def validate_fields(*, title, due, due_time, description, item_type, priority,
         raise ValueError("Event duration must be between 5 and 1440 minutes")
     if not 5 <= estimated_min <= 1440:
         raise ValueError("Estimate must be between 5 and 1440 minutes")
+    color_name = str(color_name or "Auto")
+    if color_name not in EVENT_COLORS:
+        raise ValueError("Choose a color from the available palette")
+    if repeat_weekly and item_type != "event":
+        raise ValueError("Only calendar events can repeat weekly")
+    repeat_weekly = bool(repeat_weekly)
+    repeat_until = normalize_date(repeat_until) if repeat_weekly else None
+    if repeat_weekly:
+        if repeat_until is None:
+            raise ValueError("Choose an end date for the weekly series")
+        days = (date.fromisoformat(repeat_until) - date.fromisoformat(due)).days
+        if days < 0 or days > 1095:
+            raise ValueError("Weekly events must end within three years of the first event")
+    linked_event_id = str(linked_event_id or "").strip() or None
+    if linked_event_id and item_type != "task":
+        raise ValueError("Only tasks can be attached to a calendar event")
     return dict(title=title, due=due, due_time=due_time,
                 notes=str(description).strip(), item_type=item_type,
                 priority_level=priority, duration_min=duration_min,
-                estimated_min=estimated_min)
+                estimated_min=estimated_min, color_name=color_name,
+                repeat_weekly=int(repeat_weekly), repeat_until=repeat_until,
+                linked_event_id=linked_event_id)
+
+
+def _validate_link(db, fields):
+    linked = fields["linked_event_id"]
+    if linked:
+        record = db.execute(
+            "SELECT id FROM tasks WHERE id=? AND item_type='event'", (linked,)
+        ).fetchone()
+        if record is None:
+            raise ValueError("Choose an existing calendar event to link the assignment")
 
 
 def create_item(*, title, due=None, due_time=None, description="",
-                item_type="task", priority=2, duration_min=60, estimated_min=30):
+                item_type="task", priority=2, duration_min=60, estimated_min=30,
+                color_name="Auto", repeat_weekly=False, repeat_until=None,
+                linked_event_id=None):
     """Create user-authorized local calendar entry or task."""
     fields = validate_fields(
         title=title, due=due, due_time=due_time, description=description,
         item_type=item_type, priority=priority,
         duration_min=duration_min, estimated_min=estimated_min,
+        color_name=color_name, repeat_weekly=repeat_weekly,
+        repeat_until=repeat_until, linked_event_id=linked_event_id,
     )
     ensure_schema()
     uid = str(uuid.uuid4())
     with connect() as db:
+        _validate_link(db, fields)
         db.execute(
             """INSERT INTO tasks
               (id,title,due,due_time,notes,item_type,priority_level,duration_min,
-               estimated_min,source,created_at)
-              VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+               estimated_min,color_name,repeat_weekly,repeat_until,
+               linked_event_id,source,created_at)
+              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (uid, fields["title"], fields["due"], fields["due_time"], fields["notes"],
              fields["item_type"], fields["priority_level"], fields["duration_min"],
-             fields["estimated_min"], "manual", datetime.now().isoformat()),
+             fields["estimated_min"], fields["color_name"], fields["repeat_weekly"],
+             fields["repeat_until"], fields["linked_event_id"],
+             "manual", datetime.now().isoformat()),
         )
         db.commit()
     return uid
@@ -125,20 +176,31 @@ def get_item(item_id):
 
 
 def update_item(item_id, *, title, due=None, due_time=None, description="",
-                item_type="task", priority=2, duration_min=60, estimated_min=30):
+                item_type="task", priority=2, duration_min=60, estimated_min=30,
+                color_name="Auto", repeat_weekly=False, repeat_until=None,
+                linked_event_id=None):
     fields = validate_fields(
         title=title, due=due, due_time=due_time, description=description,
         item_type=item_type, priority=priority,
         duration_min=duration_min, estimated_min=estimated_min,
+        color_name=color_name, repeat_weekly=repeat_weekly,
+        repeat_until=repeat_until, linked_event_id=linked_event_id,
     )
     ensure_schema()
     with connect() as db:
+        _validate_link(db, fields)
+        # Converting an event into a task detaches its assignment relationships.
+        if item_type != "event":
+            db.execute("UPDATE tasks SET linked_event_id=NULL WHERE linked_event_id=?", (item_id,))
         result = db.execute(
             """UPDATE tasks SET title=?,due=?,due_time=?,notes=?,item_type=?,
-              priority_level=?,duration_min=?,estimated_min=?,event_end=NULL WHERE id=?""",
+              priority_level=?,duration_min=?,estimated_min=?,event_end=NULL,
+              color_name=?,repeat_weekly=?,repeat_until=?,linked_event_id=?
+              WHERE id=?""",
             (fields["title"], fields["due"], fields["due_time"], fields["notes"],
              fields["item_type"], fields["priority_level"], fields["duration_min"],
-             fields["estimated_min"], item_id),
+             fields["estimated_min"], fields["color_name"], fields["repeat_weekly"],
+             fields["repeat_until"], fields["linked_event_id"], item_id),
         )
         db.commit()
     return bool(result.rowcount)
@@ -148,6 +210,7 @@ def delete_item(item_id):
     """Delete only after an explicit UI click/confirmation."""
     ensure_schema()
     with connect() as db:
+        db.execute("UPDATE tasks SET linked_event_id=NULL WHERE linked_event_id=?", (item_id,))
         result = db.execute("DELETE FROM tasks WHERE id=?", (item_id,))
         db.commit()
     return bool(result.rowcount)
