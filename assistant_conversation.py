@@ -125,6 +125,17 @@ def _read_calendar_question(lower, today):
         rows = schedule_for_range(start, start + timedelta(days=7))
         return format_schedule(rows, label)
 
+    if asks_about_schedule:
+        if re.search(r"\btomorrow\b", lower):
+            day = today + timedelta(days=1)
+            return format_schedule(
+                daily_items(day), day.strftime("%A, %b %d")
+            )
+        if re.search(r"\btoday\b", lower):
+            return format_schedule(
+                daily_items(today), today.strftime("%A, %b %d")
+            )
+
     if any(phrase in lower for phrase in (
         "what classes do i have", "show my classes",
         "when are my classes", "what's on my calendar",
