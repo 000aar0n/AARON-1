@@ -127,7 +127,7 @@ The training dependencies are optional and significantly larger than the basic a
 
 1. Open **Train AARON-1**. Write pairs such as **When I say:** `I have a chemistry quiz tomorrow` → **Preferred answer:** `Let's knock out the hardest concepts first. What topics are on it?` and click **Save approved example**. You can also choose an existing chat message, edit the response, and explicitly approve that pair.
 2. Approve at least **8 distinct prompt/response examples**. **30–100+ varied examples** are much more useful and less prone to memorization.
-3. Choose **Qwen2.5 0.5B**, set training passes (default 3), then click **Train AARON-1 on this computer**. This starts a local worker and updates a *new* LoRA adapter; it never edits your original downloaded base weights.
+3. Choose **Qwen2.5 0.5B**, set training passes (default 3), then click **Train AARON-1 on this computer**. This starts a local worker and updates a LoRA adapter; it never edits your original downloaded base weights. On later runs, select **Continue training my current AARON-1 adapter** to start from the previous learned weights rather than a fresh adapter (the base model must match). You can also uncheck it to reset and retrain from the pretrained base.
 4. Refresh training status to see the local run log, training loss and **held-out validation loss before and after**. Compare on actual prompts too: a lower loss on just a few validation examples does not establish that the model is generally better.
 5. Click **Use this fine-tuned AARON-1**, then open **Chat → Conversation settings** and select **AARON-1 (fine-tuned)**. Chat loads the adapter with the exact corresponding base model.
 
@@ -148,7 +148,7 @@ To run the dashboard on a separately configured PC, clone the repository, activa
 ### Engineering and privacy details
 
 - The training pipeline uses LoRA on Qwen attention projections, with the **system/user prefix masked out of the loss**. Only assistant target tokens receive gradient updates.
-- The split keeps **20% of approved pairs (minimum 2)** aside for evaluation; training never silently uses held-out examples.
+- Each run makes a fixed split with **20% of its approved pairs (minimum 2)** held out for evaluation. With incremental runs, previously seen samples may move between train and evaluation splits; use new questions for a more trustworthy independent comparison.
 - The frozen dataset, adapter checkpoints and `active_finetune.json` remain local; you can switch to a base model any time.
 - The local model can discuss your schedule. It **does not get unrestricted file, Gmail, or internet access**, nor can it automatically modify your calendar by writing arbitrary generated text.
 - Fine-tuning is an explicitly initiated, compute-intensive action. It is *not* continuous self-modification, and quality is not guaranteed. Keep a backup of important private data and avoid running an unprotected Streamlit instance over the public internet.
