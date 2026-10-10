@@ -139,7 +139,7 @@ class CalendarAssistantTests(unittest.TestCase):
         self.assertIn("aaron_chat_scroll_window", src)
         self.assertIn('st.chat_input("Talk to AARON-1…"', src)
         from app import APP_BUILD
-        self.assertIn("verified-classes-v8", APP_BUILD)
+        self.assertIn("grounded-calendar-v9", APP_BUILD)
         at = AppTest.from_file(
             str(Path(__file__).resolve().parent / "app.py"),
             default_timeout=40,
