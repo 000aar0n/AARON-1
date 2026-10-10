@@ -324,7 +324,10 @@ def respond(message, previous=(), model=None, now=None):
     )):
         day = _date_expression(agenda.group(1), now.date())
         if day:
-            return (_task_summary(daily_items(day), day.strftime("%A, %b %d")), False)
+            return (_task_summary(
+                schedule_for_range(day, day + timedelta(days=1)),
+                day.strftime("%A, %b %d"),
+            ), False)
 
     if any(phrase in lower for phrase in ("this week", "next seven days", "coming week")):
         if any(word in lower for word in ("due", "schedule", "homework", "tasks", "plans")):
@@ -344,7 +347,10 @@ def respond(message, previous=(), model=None, now=None):
     if any(phrase in lower for phrase in (
         "my schedule", "my calendar", "my day", "today's plan",
     )) and not agenda:
-        return (_task_summary(daily_items(now.date()), "today"), False)
+        return (_task_summary(
+            schedule_for_range(now.date(), now.date() + timedelta(days=1)),
+            "today",
+        ), False)
 
     if any(phrase in lower for phrase in ("all my tasks", "list my tasks",
                                          "my assignments", "unfinished tasks")):
