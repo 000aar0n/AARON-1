@@ -137,6 +137,18 @@ CALENDAR_CSS = """
 .fc .fc-timegrid-col.fc-day-today{background:#7166bb12!important}
 .fc .fc-col-header-cell-cushion{font-size:12px!important}
 .fc .fc-timegrid-axis,.fc .fc-timegrid-slot-label{min-width:58px}
+/* Minimal workspace calendar overrides: square edges, restrained chrome. */
+.fc .fc-button-primary { border-radius:3px!important; }
+.fc .fc-timegrid-event,.fc .fc-daygrid-event,.fc .fc-list-event {
+  border-radius:3px!important;
+}
+.fc .fc-view-harness,.fc .fc-popover { border-radius:3px!important; }
+.fc .fc-daygrid-day-frame { background:transparent!important; }
+.fc .fc-toolbar-title { color:#eff1f2!important;font-weight:650!important; }
+.fc .fc-event:hover { box-shadow:none!important; }
+.fc .fc-event:focus-visible { outline:2px solid #c9cfd2!important; }
+.fc .fc-timegrid-now-indicator-line,
+.fc .fc-timegrid-now-indicator-arrow { border-color:#c5cbce!important; }
 @media(max-width:850px){.fc .fc-toolbar-title{font-size:1.04rem}
  .fc .fc-button{font-size:.75rem;padding:.4em .55em}}
 """
@@ -508,9 +520,8 @@ def _calendar_editor_dialog():
 def calendar_page():
     from ui_theme import page_heading, metric
     page_heading(
-        "Time & priorities", "Your planner",
-        "Your classes, assignments and workouts — full-size. Click anything to "
-        "open a popup; the calendar stays wide.",
+        "PLANNER", "Calendar",
+        "Your classes, assignments and workouts on one accurate timeline.",
     )
     today = date.today()
     upcoming = upcoming_workout(today)

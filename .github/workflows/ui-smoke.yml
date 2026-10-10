@@ -1,0 +1,29 @@
+name: UI smoke check
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [design/minimal-workspace]
+jobs:
+  syntax-and-layout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check Python syntax
+        run: python -m compileall -q app.py ui_theme.py planner_ui.py training_ui.py
+      - name: Verify dedicated pages and no legacy tabs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          app = Path("app.py").read_text(encoding="utf-8")
+          assert "st.navigation(pages" in app
+          assert "st.tabs(" not in app
+          for page in ("Planner", "Chat", "Model Lab", "Settings"):
+              assert f'title="{page}"' in app
+          css = Path("ui_theme.py").read_text(encoding="utf-8")
+          assert 'border-radius:3px' in css
+          print("UI structure checks passed")
+          PY
