@@ -1,6 +1,6 @@
 # 🤖 AARON-1 — your personal assistant
 
-**One assistant. Five tabs. Persistent memory, Google Calendar ZIP import, Winter Arc workouts, and a fine-tunable local conversational model.**
+**A minimal four-page personal workspace: Planner, Chat, Model Lab and Settings. Includes calendar importing, recurring workouts and optional local fine-tuning.**
 
 This version has replaced the sender/receiver, evolution, and sandbox-network experiments. Old experiment source files were removed. Files and checkpoints already saved on your computer under `data/` were **not deleted**; previously taught personal facts are migrated into the new task database.
 
