@@ -96,7 +96,9 @@ def _new_item(day=None, at_time=None, kind="task"):
 
 
 def _render_editor(*, scope):
-    """One editor for tasks/events; retained data is the same across pages."""
+    """One editor; each Streamlit tab has unique widget keys, shared task state."""
+    if scope not in ("calendar", "priorities"):
+        raise ValueError("Invalid editor scope")
     existing = get_item(st.session_state.get("planner_editor_id")) if (
         st.session_state.get("planner_editor_id")) else None
     nonce = st.session_state.get("planner_editor_nonce", 0)
@@ -226,6 +228,9 @@ def _render_editor(*, scope):
 
 
 def _action_list(limit=5, *, scope):
+    """Show a duplicated recommendation list with unique keys per tab."""
+    if scope not in ("calendar", "priorities"):
+        raise ValueError("Invalid recommendation scope")
     actions = next_actions(limit=limit)
     if not actions:
         st.success("You're clear! No outstanding tasks.")
@@ -421,4 +426,4 @@ def tasks_page():
             _new_item(kind="task")
             st.rerun()
         with st.container(border=True):
-            _render_editor()
+            _render_editor(scope="priorities")
