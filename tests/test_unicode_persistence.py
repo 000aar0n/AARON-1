@@ -160,7 +160,9 @@ class UnicodePersistenceTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("def _database_startup_help(exc)", app_source)
         self.assertIn("st.stop()", app_source)
-        self.assertNotIn("st.error(str(exc))", app_source)
+        recovery_section = app_source.split("def _database_startup_help(exc)", 1)[1]
+        self.assertIn('st.error("AARON-1 couldn\'t open its database.")', recovery_section)
+        self.assertNotIn('st.error(str(exc))', recovery_section.split("def main():", 1)[1])
 
     def test_half_configured_remote_fails_closed(self):
         def secret(key):
