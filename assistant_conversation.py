@@ -128,7 +128,10 @@ def _read_calendar_question(lower, today):
     if any(phrase in lower for phrase in (
         "what classes do i have", "show my classes",
         "when are my classes", "what's on my calendar",
-        "whats on my calendar",
+        "whats on my calendar", "what's my schedule",
+        "what is my schedule", "what's my calendar",
+        "what is my calendar", "what's my class schedule",
+        "show me my calendar", "show my calendar",
     )) and not any(name in lower for name in WEEKDAYS + ("today", "tomorrow")):
         rows = schedule_for_range(today, today + timedelta(days=7))
         return format_schedule(rows, "the next seven days")
