@@ -96,37 +96,43 @@ def _priority_reply():
 
 
 def _is_personal_calendar_query(text):
-    """Distinguish *my* timetable questions from general schoolwork discussion.
+    """Route personal timetable queries to SQL, not generative model output.
 
-    Any matching question must use saved SQLite events; the language model is
-    never trusted to guess class names, teachers, rooms, or enrollment.
+    Preserve ordinary academic explanations ("what is a class in Python?")
+    and explicit add-task commands instead of misrouting all uses of "class".
     """
-    calendar_words = re.search(
-        r"\b(?:calendar|schedule|timetable|classes|class|courses?|"
-        r"teachers?|instructors?|classrooms?|homerooms?|periods?|"
-        r"lessons?|appointments?|meetings?)\b", text,
-    )
-    personal = re.search(
-        r"\b(?:my|mine|i|me|we|our|am i|do i|have i)\b", text,
-    )
+    if re.match(r"^(?:add|create|schedule)\s+(?:task|event)\s+", text):
+        return False
+
+    personal = bool(re.search(r"\b(?:my|mine|i|me|we|our)\b", text))
     question = text.startswith((
         "what", "when", "where", "which", "who", "show", "tell", "list",
         "do i", "am i", "are my", "is my", "can you check", "give me",
     ))
-    if calendar_words and (personal or question):
+    temporal = bool(re.search(
+        r"\b(?:today|tomorrow|tonight|week|weekend|monday|tuesday|"
+        r"wednesday|thursday|friday|saturday|sunday)\b", text
+    ))
+    timetable = bool(re.search(
+        r"\b(?:calendar|schedule|timetable|appointments?|classrooms?|"
+        r"teachers?|instructors?|homerooms?|who teaches)\b", text
+    ))
+    classes = bool(re.search(
+        r"\b(?:classes|class|courses?|lessons?|subjects?|periods?)\b", text
+    ))
+    if timetable and (personal or question or temporal):
         return True
-    if question and (
-        re.search(
-            r"\b(?:today|tomorrow|next week|this week|on "
-            r"(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b",
-            text,
-        ) and re.search(
-            r"\b(?:have|doing|going|happening|school|plans?|"
-            r"assignments?|anything|busy)\b", text,
-        )
+    if classes and (personal or temporal or re.search(
+        r"\b(?:when|where|who|which classes|show classes|list classes)\b", text
+    )):
+        return True
+    if question and temporal and re.search(
+        r"\b(?:have|doing|going|happening|school|plans?|"
+        r"assignments?|anything|busy|what's on|whats on)\b", text
     ):
         return True
     return False
+
 
 
 def _field_from_saved_event(event, kind):
