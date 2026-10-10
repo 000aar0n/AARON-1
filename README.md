@@ -23,7 +23,7 @@ grep -n '_render_editor(scope=' planner_ui.py
 Priorities editors. If Git reports a merge/checkout error, the local files
 are stale; don't delete or reset your work. Resolve the Git error before
 launching the app. In the running UI, look for
-**`AARON-1 build 2026.10.10-grounded-calendar-v9`** near the top.
+**`AARON-1 build 2026.10.10-aligned-calendar-v10`** near the top.
 Stop any old Streamlit terminals before restarting, and reload the browser.
 
 ### Delete one task or clear all tasks you entered
@@ -75,7 +75,7 @@ git pull --ff-only origin main
 .venv312/bin/python -m streamlit run app.py
 ```
 
-Look for **AARON-1 build 2026.10.10-calendar-winterarc-v4** near the top.
+Look for **AARON-1 build 2026.10.10-aligned-calendar-v10** near the top.
 Then open **Connections → Google Calendar**, drag in the ZIP, and click
 **Import Google Calendar**. The default range is from 30 days ago through
 18 months afterward; choose a different range before importing if needed.
@@ -122,9 +122,25 @@ imported to AARON-1. If something is absent, import the current calendar
 again via Connections. Never upload a personal ICS export or database to
 this public GitHub repository.
 
-The **Readable Week** calendar view continues to display fully wrapping
-event cards. A scrollable 390px **Every title, fully readable** list is
-available below it; the optional Hour Grid preserves a classic time view.
+The Planner has **one calendar** with the weekly hour-by-hour timeline as
+the default. Times align to the minute on a shared clock axis (so a class at
+08:10 appears between the 08:00 and 08:30 grid labels). The duplicate
+"Every title, fully readable" second week section was removed.
+
+### Diagnosing an invented class in Chat
+
+In **Chat → Check the exact calendar records AARON-1 is reading**, choose a
+starting date. The collapsed panel lists the exact saved event title, time,
+kind, source, and record ID for the next seven days. If a previously generated
+chat reply claims a class that isn't in those records, treat that reply as
+incorrect. Personal calendar questions use deterministic records instead of
+model guesses; old AI chat messages are not deleted automatically. The
+model's input context excludes older assistant messages containing timetable
+claims to avoid reinforcing old hallucinations.
+
+Verify the visible build is **2026.10.10-aligned-calendar-v10** and restart the
+old Streamlit process after updating. If your browser still displays an older
+build or a different running instance, those fixes won't take effect.
 
 ## Local calendar questions and scrollable AI chat
 
@@ -155,12 +171,23 @@ closing the event's popup so it's obvious which class you last selected.
 
 ## Full-width calendar and pop-up editor
 
-The **Planner** calendar now uses the full available width instead of sharing
-the screen with an always-visible event editor. It uses an auto-height **Readable Week** layout, with clearer multi-line
-event titles and non-overlapping cards. The optional Hour Grid still displays
-timed appointments.
+The **Planner** calendar uses the entire available width, with a **single,
+clock-aligned Week view** (plus Day, Month, and Agenda options). Classes appear
+at their exact saved start/end times and do not overlap visually in the week
+grid. Event labels fit in their available time blocks; for very short classes,
+click the block to read its full title in the popup. The redundant second
+weekly schedule panel has been removed.
 Blue means **Classes** in the legend (your school calendar imported from
 Google), green is Winter Arc, and other colors indicate events and homework.
+
+**Assignments:** Tasks with only a date appear in the top **TASKS** / all-day
+header. Tasks with an exact deadline appear **twice in the visual calendar**:
+one top reminder (including due time and linked class, if any), and a separate
+15-minute **⏰ DUE** marker at the saved minute. These are two views of the
+**same task** — one database row, one completion state. Clicking either opens
+the same assignment editor. Assignments linked to a class also remain visible
+inside that class's event popup. Neither your existing tasks nor imported class
+times are altered by changing this display.
 
 Click a calendar class/event/assignment to open its details in a **large
 popup**, including the full title, notes, and linked assignments. Click an
