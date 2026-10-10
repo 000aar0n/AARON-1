@@ -24,6 +24,7 @@ from planner import ensure_schema
 from assistant_conversation import respond, local_models
 from training_ui import training_page
 from training_data import trained_model
+from trained_chat import inference_dependencies_ready
 
 st.set_page_config(page_title="AARON-1", page_icon="🤖", layout="wide")
 
@@ -211,42 +212,65 @@ def render_chat():
     )
     with st.expander("🧠 Conversation settings", expanded=False):
         active_adapter = trained_model()
+        ready = inference_dependencies_ready()
         ollama_options = available_local_models()
-        options = (["Planner only (rules)"] +
-                   (["AARON-1 (fine-tuned)"] if active_adapter else []) +
-                   ollama_options)
+        # Direct Transformers inference needs no Ollama installation.
+        options = (
+            ["AARON-1 (pretrained · no Ollama)"] if ready else []
+        ) + (
+            ["AARON-1 (fine-tuned)"] if active_adapter else []
+        ) + ["Planner only (rules)"] + ollama_options
+
         current = st.session_state.get("aaron_selected_chat_model")
-        current_label = ("AARON-1 (fine-tuned)" if current == "__aaron_trained__"
-                         else current if current in options else None)
+        current_label = (
+            "AARON-1 (fine-tuned)" if current == "__aaron_trained__"
+            else "AARON-1 (pretrained · no Ollama)" if current == "__aaron_base__"
+            else current if current in options else None
+        )
         if current_label not in options:
-            current_label = ("AARON-1 (fine-tuned)" if active_adapter
-                             else ollama_options[0] if ollama_options
-                             else options[0])
+            current_label = (
+                "AARON-1 (fine-tuned)" if active_adapter and
+                inference_dependencies_ready(adapter=True)
+                else "AARON-1 (pretrained · no Ollama)" if ready
+                else ollama_options[0] if ollama_options
+                else "Planner only (rules)"
+            )
         if st.session_state.get("aaron_model_picker") not in options:
             st.session_state.pop("aaron_model_picker", None)
         choice = st.selectbox(
             "Conversation engine", options,
             index=options.index(current_label),
-            help="Only explicit planner commands can change assignments. "
-                 "Language model replies cannot silently take actions.",
+            help="The pretrained model runs in Python, without Ollama. "
+                 "A trained adapter is optional. Tasks change only through "
+                 "verified commands.",
             key="aaron_model_picker",
         )
         st.session_state["aaron_selected_chat_model"] = (
             "__aaron_trained__" if choice == "AARON-1 (fine-tuned)"
+            else "__aaron_base__" if choice == "AARON-1 (pretrained · no Ollama)"
             else None if choice == "Planner only (rules)"
             else choice
         )
-        if choice == "AARON-1 (fine-tuned)":
-            st.success("Fine-tuned AARON-1 is active. Your local LoRA adapter "
-                       "loads on the first conversation.")
+        if choice == "AARON-1 (pretrained · no Ollama)":
+            st.success("No Ollama needed. Qwen2.5 0.5B runs through PyTorch. "
+                       "The first message downloads and caches the model.")
+        elif choice == "AARON-1 (fine-tuned)":
+            st.success("Using your fine-tuned adapter with the pretrained "
+                       "Qwen base model. No Ollama needed.")
         elif choice in ollama_options:
-            st.success("Local Ollama conversation enabled")
+            st.success("Using optional local Ollama.")
         else:
-            st.info("Using basic rule-based chat. For full conversations, "
-                    "fine-tune AARON-1 in Train or install Ollama.")
-        if not ollama_options and not active_adapter:
-            st.caption("Optional pretrained conversational baseline:")
-            st.code("ollama pull qwen2.5:3b", language="bash")
+            st.info("Rule-based planner chat is active. For natural "
+                    "conversations, install the training dependencies below.")
+        if not ready:
+            st.caption("One-time setup for pretrained chat and fine-tuning:")
+            st.code(
+                "python3 -m pip install -r requirements-training.txt",
+                language="bash",
+            )
+        st.caption("Conversation runs on your computer, not ChatGPT's servers. "
+                   "The model's base weights come from Hugging Face once; "
+                   "your tasks and memories remain local.")
         if st.button("Refresh local models", key="refresh_local_models"):
             available_local_models.clear()
             st.rerun()
