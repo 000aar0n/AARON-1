@@ -392,6 +392,11 @@ def import_google_calendar(payload, filename, *, from_date=None, months=18):
             all_records.update(records)
             removed.update(cancelled)
             components += count
+            if len(all_records) > MAX_OCCURRENCES:
+                raise ValueError(
+                    "Calendar contains too many occurrences for one import. "
+                    "Choose a shorter import date range."
+                )
     ensure_schema()
     created, refreshed, deleted = 0, 0, 0
     # One transaction: either the entire calendar import succeeds or none.
