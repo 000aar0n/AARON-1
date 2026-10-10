@@ -1,7 +1,7 @@
 name: Verify AARON-1
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, 'feature/windows-support']
   workflow_dispatch:
 
 permissions:
@@ -9,10 +9,11 @@ permissions:
 
 jobs:
   tests:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         python-version: ['3.11', '3.12']
     steps:
       - uses: actions/checkout@v4
@@ -22,6 +23,14 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
       - name: Check Python syntax
-        run: python -m compileall -q app.py assistant_core.py gmail_access.py avatar.py test_assistant.py planner.py planner_ui.py assistant_conversation.py test_planner.py training_data.py training_ui.py train_aaron.py trained_chat.py test_training.py test_planner_widgets.py clear_my_tasks.py test_task_cleanup.py google_calendar_import.py winter_arc.py test_google_calendar.py test_calendar_features.py test_calendar_popup.py test_calendar_chat.py test_verified_classes.py test_calendar_timeline.py calendar_context.py
+        run: python -m compileall -q app.py assistant_core.py gmail_access.py avatar.py test_assistant.py planner.py planner_ui.py assistant_conversation.py test_planner.py training_data.py training_ui.py train_aaron.py trained_chat.py test_training.py test_planner_widgets.py clear_my_tasks.py test_task_cleanup.py google_calendar_import.py winter_arc.py test_google_calendar.py test_calendar_features.py test_calendar_popup.py test_calendar_chat.py test_verified_classes.py test_calendar_timeline.py calendar_context.py test_windows_support.py
+      - name: Smoke-test Windows setup launcher
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call setup_windows.cmd
+      - name: Smoke-test Windows virtual environment
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: .venv-win\Scripts\python.exe -c "import streamlit, streamlit_calendar, icalendar; from zoneinfo import ZoneInfo; assert ZoneInfo('America/New_York')"
       - name: Run offline regression tests
-        run: python -m unittest -v test_assistant.py test_planner.py test_training.py test_planner_widgets.py test_task_cleanup.py test_google_calendar.py test_calendar_features.py test_calendar_popup.py test_calendar_chat.py test_verified_classes.py test_calendar_timeline.py calendar_context.py
+        run: python -m unittest -v test_assistant.py test_planner.py test_training.py test_planner_widgets.py test_task_cleanup.py test_google_calendar.py test_calendar_features.py test_calendar_popup.py test_calendar_chat.py test_verified_classes.py test_calendar_timeline.py calendar_context.py test_windows_support.py
