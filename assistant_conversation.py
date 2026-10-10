@@ -14,6 +14,10 @@ from urllib.request import Request, urlopen
 
 from assistant_core import remember, recall, connect
 from planner import create_item, daily_items, next_actions, open_tasks, PRIORITY_NAMES
+from calendar_context import (
+    calendar_model_context, find_upcoming_title, format_schedule,
+    schedule_for_range,
+)
 
 OLLAMA_BASE = "http://127.0.0.1:11434"
 WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday",
@@ -91,6 +95,75 @@ def _priority_reply():
     return "\n".join(lines)
 
 
+def _read_calendar_question(lower, today):
+    """Answer common schedule questions from the real local calendar.
+
+    This runs before the optional model, so calendar facts never depend on
+    hallucinated LLM replies and do not require Ollama or model downloads.
+    Returns None when the request is not a calendar read.
+    """
+    asks_about_schedule = any(
+        phrase in lower for phrase in (
+            "calendar", "schedule", "classes", "class", "events", "appointments",
+            "what do i have", "what's happening", "whats happening",
+            "what am i doing", "what's on", "whats on",
+        )
+    )
+    if any(phrase in lower for phrase in (
+        "this week", "next week", "coming week", "next seven days",
+        "next 7 days",
+    )) and asks_about_schedule:
+        if "next week" in lower:
+            start = today + timedelta(days=7 - today.weekday())
+            label = "next week"
+        elif "this week" in lower:
+            start = today - timedelta(days=today.weekday())
+            label = "this week"
+        else:
+            start = today
+            label = "the next seven days"
+        rows = schedule_for_range(start, start + timedelta(days=7))
+        return format_schedule(rows, label)
+
+    if any(phrase in lower for phrase in (
+        "what classes do i have", "show my classes",
+        "when are my classes", "what's on my calendar",
+        "whats on my calendar",
+    )) and not any(name in lower for name in WEEKDAYS + ("today", "tomorrow")):
+        rows = schedule_for_range(today, today + timedelta(days=7))
+        return format_schedule(rows, "the next seven days")
+
+    title_query = re.match(
+        r"^(?:when (?:is|are) |when do i have |"
+        r"what time (?:is|are) |what date (?:is|are) )(.+)$",
+        lower,
+    )
+    if title_query:
+        name = title_query.group(1).strip()
+        name = re.sub(
+            r"^(?:(?:my|the|next|first|upcoming)\\s+)+", "", name
+        ).strip()
+        if not name or name in ("class", "classes", "event", "events"):
+            return None
+        matches = find_upcoming_title(name, today=today)
+        if not matches:
+            short = re.sub(
+                r"\\s+(?:class|event|meeting|lesson)$", "", name
+            ).strip()
+            if short != name:
+                matches = find_upcoming_title(short, today=today)
+        if matches:
+            return format_schedule(
+                matches[:5], "upcoming " + name, max_events=5
+            )
+        return (
+            "I couldn't find an upcoming **" + name +
+            "** on your local calendar. Check Planner or import the class "
+            "from Connections → Google Calendar."
+        )
+    return None
+
+
 def _local_model_reply(message, previous, model):
     """No external network calls; use only a loopback model explicitly enabled."""
     actions = next_actions(limit=8)
@@ -109,6 +182,7 @@ def _local_model_reply(message, previous, model):
             ).fetchall()
         ]
     memory_context = "\n".join(known_facts)[:3000]
+    local_calendar = calendar_model_context(days=14, max_events=48)
     system = (
         "You are the conversational voice for AARON-1, a user's locally running "
         "planner and assistant. Speak like an easygoing, curious friend, concise "
@@ -121,7 +195,9 @@ def _local_model_reply(message, previous, model):
         "Respect boundaries and privacy. Current local datetime: "
         f"{datetime.now().isoformat(timespec='minutes')}. "
         "User-taught memories:\n" + (memory_context or "None") + "\n" +
-        "Known outstanding priorities:\n" + "\n".join(tasks or ["None"])
+        "Known outstanding priorities:\n" + "\n".join(tasks or ["None"]) +
+        "\nLocal calendar (read-only, includes class meetings and linked homework):\n" +
+        local_calendar
     )
     context = [{"role": "system", "content": system}]
     for item in previous[-10:]:
@@ -166,6 +242,12 @@ def respond(message, previous=(), model=None, now=None):
     lower = (message or "").strip().lower().rstrip("!?. ")
     if not lower:
         return ("Say something and I'll help.", False)
+
+    # Before any generic memory regex or generative model call, handle
+    # read-only calendar questions against real local data (weekly series too).
+    calendar_reply = _read_calendar_question(lower, now.date())
+    if calendar_reply is not None:
+        return (calendar_reply, False)
 
     # Explicit commands are handled deterministically: no tool access for a
     # generative model and no automatic destructive actions.
