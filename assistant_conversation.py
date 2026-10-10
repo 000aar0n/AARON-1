@@ -541,6 +541,37 @@ def respond(message, previous=(), model=None, now=None):
     if model:
         return (_local_model_reply(message, list(previous), model), False)
 
+    # Basic Chinese replies for the hosted rules-only mode. A full Chinese
+    # conversation still requires a language model; don't fake fluency.
+    # Unicode is preserved throughout the chat and SQLite storage paths.
+    if re.search(r"[\u3400-\u9fff]", message):
+        if lower in ("你好", "您好", "嗨", "哈喽", "你好呀"):
+            return (
+                "你好！我可以帮你查看日程和任务。你想先做什么？", False
+            )
+        if any(word in lower for word in ("日程", "安排", "有什么课", "什么课", "作业")):
+            day = (now.date() + timedelta(days=1)
+                   if "明天" in lower else now.date())
+            entries = schedule_for_range(day, day + timedelta(days=1))
+            label = "明天" if "明天" in lower else "今天"
+            if not entries:
+                return (f"{label}的日历里没有已保存的活动或任务。", False)
+            rows = [f"{label}已保存的活动和任务："]
+            for entry in entries[:12]:
+                rows.append(
+                    f"• {entry.get('due_time') or '全天'} — {entry['title']}"
+                )
+            if len(entries) > 12:
+                rows.append(f"还有 {len(entries) - 12} 项，请查看日历。")
+            return ("\n".join(rows), False)
+        return (
+            "我可以正常接收和显示中文。不过，当前这个版本使用的是"
+            "规则式助手，暂时无法进行自由的中文对话。"
+            "你可以询问“今天有什么课？”或“明天有什么安排？”，"
+            "也可以在支持模型的设备上开启语言模型。",
+            False,
+        )
+
     # Symbolic fallback uses recent conversation context, but is not falsely
     # presented as open-ended generative intelligence.
     if any(word in lower for word in ("stressed", "overwhelmed", "anxious", "panicking")):
