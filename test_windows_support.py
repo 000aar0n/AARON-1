@@ -32,6 +32,8 @@ class WindowsSupportTests(unittest.TestCase):
 
     def test_imports_are_not_anchored_to_mac_user_paths(self):
         for path in ROOT.glob("*.py"):
+            if path.name == "test_windows_support.py":
+                continue  # This test necessarily contains its own regex literal.
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=path.name)
             strings = [
                 n.value for n in ast.walk(tree)
