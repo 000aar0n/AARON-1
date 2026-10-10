@@ -216,7 +216,7 @@ class CalendarFeatureTests(unittest.TestCase):
 
     def test_full_app_has_color_weekly_and_assignment_controls(self):
         from app import APP_BUILD
-        self.assertIn("grounded-calendar-v9", APP_BUILD)
+        self.assertIn("aligned-calendar-v10", APP_BUILD)
         series = self.create_weekly()
         planner.create_item(title="Class assignment", linked_event_id=series)
         app = AppTest.from_file(
