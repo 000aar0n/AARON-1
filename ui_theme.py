@@ -32,6 +32,23 @@ html,body,[data-testid="stAppViewContainer"],[data-testid="stMain"] {
   border-right:1px solid var(--a-border)!important;
 }
 [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{font-size:13px}
+[data-testid="stSidebarNav"] a,
+[data-testid="stSidebarNav"] [data-testid="stSidebarNavLink"]{
+  border-radius:3px!important;
+  padding:9px 12px!important;
+  font-size:13px!important;
+}
+[data-testid="stSidebarNav"] a[aria-current="page"]{
+  background:#24282b!important;color:#fff!important;
+}
+[data-testid="stSegmentedControl"] button,
+[data-testid="stSegmentedControl"] [role="radiogroup"] label,
+[data-testid="stSegmentedControl"] [role="radio"]{
+  border-radius:3px!important;
+}
+[data-testid="stPill"],[data-testid="stPillContainer"] button{
+  border-radius:3px!important;
+}
 [data-testid="stSidebar"] [role="radiogroup"]{gap:5px!important}
 [data-testid="stSidebar"] [role="radiogroup"] label{
   border-radius:3px!important;
