@@ -648,12 +648,23 @@ def calendar_page():
         "at their exact time."
     )
 
-    # Full-width calendar. Weekly occurrences are expanded only for the
-    # supported nearby range; the single canonical event remains editable.
+    # Render only the active view. Previously three years of events (including
+    # imported occurrences) were expanded and sent to the browser on EVERY
+    # Streamlit rerun, which can exhaust Render's 512 MiB free instance.
     anchor, current_view = _render_calendar_navigation(today)
-    # Include the requested period even if the user browses outside this year.
-    range_start = min(today, anchor) - timedelta(days=365)
-    range_end = max(today, anchor) + timedelta(days=730)
+    if current_view == "Month":
+        first = date(anchor.year, anchor.month, 1)
+        last = date(anchor.year, anchor.month, monthrange(anchor.year, anchor.month)[1])
+        range_start = first - timedelta(days=first.weekday())
+        # Show the complete final week in the month, ending exclusively.
+        range_end = last + timedelta(days=7 - last.weekday())
+    elif current_view == "Day":
+        range_start = anchor
+        range_end = anchor + timedelta(days=1)
+    else:
+        range_start = anchor - timedelta(days=anchor.weekday())
+        range_end = range_start + timedelta(days=7)
+    # Fetch a bounded set of rows and build only events overlapping that view.
     all_events = calendar_events(
         items_for_calendar(start=range_start, end=range_end),
         start=range_start, end=range_end,

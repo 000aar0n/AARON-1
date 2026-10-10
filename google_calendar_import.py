@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+from collections import defaultdict
 import sqlite3
 import uuid
 import zipfile
@@ -289,6 +290,81 @@ def _calendar_records(raw, filename, window_start, window_end):
     return records, cancelled, len(components)
 
 
+def _component_uid(raw_component, fallback):
+    """Read a folded iCalendar UID for grouping recurrence exceptions.
+
+    Grouping by UID ensures a moved/cancelled occurrence is parsed in the same
+    small batch as its original recurring series.
+    """
+    lines = raw_component.splitlines()
+    for index, line in enumerate(lines):
+        if line.upper().startswith((b"UID:", b"UID;")):
+            raw_value = line.partition(b":")[2]
+            for continued in lines[index + 1:]:
+                if continued.startswith((b" ", b"\t")):
+                    raw_value += continued[1:]
+                else:
+                    break
+            return raw_value.decode("utf-8", errors="replace")
+    return "no-uid:" + str(fallback)
+
+
+def _iter_calendar_batches(raw, *, batch_size=100):
+    """Split raw ICS into small valid calendars without parsing all VEVENTs.
+
+    Calendar.from_ical(raw) creates a Python object tree for every event at
+    once. Large exported school calendars can hit Render free's memory limit.
+    Instead keep lightweight raw VEVENT bytes, grouping recurrences by UID,
+    and parse no more than ~100 components per Calendar.from_ical call.
+    """
+    if not 1 <= batch_size <= MAX_COMPONENTS:
+        raise ValueError("Invalid calendar batch size")
+    zones = []
+    groups = defaultdict(list)
+    component = None
+    zone_lines = None
+    count = 0
+    for line in io.BytesIO(raw):
+        marker = line.strip().upper()
+        if component is not None:
+            component.append(line)
+            if marker == b"END:VEVENT":
+                count += 1
+                if count > MAX_COMPONENTS:
+                    raise ValueError("Calendar has more than 15,000 events")
+                raw_event = b"".join(component)
+                groups[_component_uid(raw_event, count)].append(raw_event)
+                component = None
+        elif zone_lines is not None:
+            zone_lines.append(line)
+            if marker == b"END:VTIMEZONE":
+                zones.append(b"".join(zone_lines))
+                zone_lines = None
+        elif marker == b"BEGIN:VEVENT":
+            component = [line]
+        elif marker == b"BEGIN:VTIMEZONE":
+            zone_lines = [line]
+    if component is not None or zone_lines is not None:
+        raise ValueError("Incomplete calendar event or time zone definition")
+    if not groups:
+        return
+
+    header = b"BEGIN:VCALENDAR\r\nVERSION:2.0\r\n" + b"".join(zones)
+    footer = b"END:VCALENDAR\r\n"
+    chunk, chunk_count = [], 0
+    for series_events in groups.values():
+        if chunk and chunk_count + len(series_events) > batch_size:
+            yield header + b"".join(chunk) + footer
+            chunk, chunk_count = [], 0
+        chunk.extend(series_events)
+        chunk_count += len(series_events)
+        if chunk_count >= batch_size:
+            yield header + b"".join(chunk) + footer
+            chunk, chunk_count = [], 0
+    if chunk:
+        yield header + b"".join(chunk) + footer
+
+
 def import_google_calendar(payload, filename, *, from_date=None, months=18):
     """Import upcoming events to the local DB; return counts, safe to rerun.
 
@@ -306,12 +382,21 @@ def import_google_calendar(payload, filename, *, from_date=None, months=18):
     files = _extract_ics_files(payload, filename)
     all_records, removed, components = {}, set(), 0
     for name, raw in files:
-        records, cancelled, count = _calendar_records(
-            raw, name, from_date, until
-        )
-        all_records.update(records)
-        removed.update(cancelled)
-        components += count
+        # Parsing every VEVENT in a 16–40 MB ICS at once can exceed the memory
+        # budget on small hosting instances. Batches are UID-aware so event
+        # masters, moved instances and cancellations stay together.
+        for chunk in _iter_calendar_batches(raw):
+            records, cancelled, count = _calendar_records(
+                chunk, name, from_date, until
+            )
+            all_records.update(records)
+            removed.update(cancelled)
+            components += count
+            if len(all_records) > MAX_OCCURRENCES:
+                raise ValueError(
+                    "Calendar contains too many occurrences for one import. "
+                    "Choose a shorter import date range."
+                )
     ensure_schema()
     created, refreshed, deleted = 0, 0, 0
     # One transaction: either the entire calendar import succeeds or none.
