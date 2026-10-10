@@ -143,7 +143,8 @@ class TaskCleanupTests(unittest.TestCase):
         self.assertIn("priorities_planner_0_title", [
             field.key for field in at.get("text_input")
         ])
-        self.assertIn("calendar_planner_0_title", [
+        # The Planner editor is now in a popup rather than always visible.
+        self.assertNotIn("calendar_planner_0_title", [
             field.key for field in at.get("text_input")
         ])
         self.assertTrue(any(
@@ -161,7 +162,8 @@ class TaskCleanupTests(unittest.TestCase):
             repr([e.message for e in at.exception])
         )
         segmented = [widget.key for widget in at.get("segmented_control")]
-        self.assertIn("calendar_planner_4_type", segmented)
+        self.assertNotIn("calendar_planner_4_type", segmented)
+        self.assertIn("planner_new_event", [button.key for button in at.button])
         self.assertIn("priorities_planner_4_type", segmented)
 
     def test_cancel_single_delete_does_not_remove_task(self):
