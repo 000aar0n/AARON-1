@@ -7,6 +7,7 @@ from calendar import monthrange
 from datetime import date, datetime, time, timedelta
 
 import streamlit as st
+from unicode_support import FONT_IMPORT, FONT_STACK
 from streamlit_calendar import calendar
 
 from assistant_core import learn_priority
@@ -20,13 +21,15 @@ from planner import (
 )
 
 CALENDAR_CSS = """
+UNICODE_FONT_IMPORT
 .fc {--fc-border-color:#2a3142; --fc-page-bg-color:#10151e;
      --fc-neutral-bg-color:#171e2a; --fc-today-bg-color:#7361c11a;
-     color:#e5e8f1; font-family:Inter,system-ui,"PingFang SC",
-     "Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",
-     "Noto Sans SC","WenQuanYi Micro Hei","Segoe UI Symbol",
-    "Noto Sans Symbols 2","Noto Sans Math","Apple Color Emoji",
-    "Segoe UI Emoji","Noto Color Emoji",sans-serif}
+     color:#e5e8f1; font-family:UNICODE_FONT_STACK!important}
+.fc .fc-event-title,.fc .fc-list-event-title,.fc .fc-event-time,
+.fc .fc-toolbar-title,.fc .fc-col-header-cell-cushion,
+.fc .fc-daygrid-day-number,.fc .fc-list-day-text,.fc .fc-popover {
+ font-family:UNICODE_FONT_STACK!important
+}
 .fc .fc-toolbar {margin-bottom:20px}
 .fc .fc-toolbar-title {font-size:1.35rem;font-weight:740;letter-spacing:-.035em;color:#f5f6ff}
 .fc .fc-button-primary {background:#262e40;border-color:#404b63;
@@ -156,7 +159,7 @@ CALENDAR_CSS = """
 .fc .fc-timegrid-now-indicator-arrow { border-color:#c5cbce!important; }
 @media(max-width:850px){.fc .fc-toolbar-title{font-size:1.04rem}
  .fc .fc-button{font-size:.75rem;padding:.4em .55em}}
-"""
+""".replace("UNICODE_FONT_IMPORT", FONT_IMPORT).replace("UNICODE_FONT_STACK", FONT_STACK)
 
 
 CALENDAR_VIEWS = {
