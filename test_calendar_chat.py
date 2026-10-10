@@ -131,6 +131,60 @@ class CalendarAssistantTests(unittest.TestCase):
         self.assertIn("read-only", prompt)
         self.assertIn("UNTRUSTED DATA", prompt)
 
+    def test_old_fabricated_class_replies_never_reenter_model_prompt(self):
+        self.seed()
+        payload = {}
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def read(self):
+                return b'{"message":{"content":"Try a five-minute review break."}}'
+
+        def fake_open(request, timeout=75):
+            payload.update(json.loads(request.data.decode("utf-8")))
+            return FakeResponse()
+
+        history = [
+            {
+                "role": "assistant",
+                "message": (
+                    "Your class schedule includes Advanced Architecture at 10:05 "
+                    "with Teacher Atlas — this is made up."
+                ),
+            },
+            {"role": "user", "message": "I want to be organized."},
+        ]
+        with patch.object(conv, "urlopen", side_effect=fake_open):
+            answer, changed = conv.respond(
+                "Can you help me be organized?",
+                previous=history,
+                model="qwen2.5:3b",
+                now=datetime(2026, 10, 10),
+            )
+        self.assertFalse(changed)
+        self.assertIn("review break", answer)
+        content = " ".join(
+            item["content"] for item in payload["messages"]
+        )
+        self.assertNotIn("Advanced Architecture", content)
+        self.assertNotIn("Teacher Atlas", content)
+        self.assertIn("Chemistry Class", content)
+        self.assertIn("I want to be organized.", content)
+
+    def test_local_calendar_evidence_panel_exists_in_chat(self):
+        import app
+        from inspect import getsource
+        source = getsource(app.render_chat)
+        self.assertIn(
+            "Check the exact calendar records AARON-1 is reading", source
+        )
+        self.assertIn("Record ID", source)
+        self.assertIn("Exact saved title", source)
+        self.assertIn("schedule_for_range(", source)
+
     def test_chat_history_is_scrollable_without_hiding_input(self):
         import app
         from inspect import getsource
