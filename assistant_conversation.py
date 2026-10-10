@@ -97,7 +97,8 @@ def _local_model_reply(message, previous, model):
     tasks = [
         f"{t['title']} | due {t.get('due') or 'unscheduled'} "
         f"{t.get('due_time') or ''} | priority {PRIORITY_NAMES[int(t.get('priority_level') or 2)]} "
-        f"| {t['why']}"
+        f"| {t['why']} "
+        f"| note: {str(t.get('notes') or '')[:180]}"
         for t in actions
     ]
     system = (
