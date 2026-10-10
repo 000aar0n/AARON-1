@@ -108,6 +108,33 @@ CALENDAR_CSS = """
   outline:3px solid #f9edac!important;outline-offset:1px!important;
   box-shadow:0 0 0 5px #7870d46e,0 5px 22px #06080caa!important;
   filter:brightness(1.2)!important;z-index:11!important}
+/* Clock-aligned timeline. Let FullCalendar own actual event positioning:
+   no artificial height, overflow or 42px minimum that spans wrong slots. */
+.fc .fc-timegrid-slot{height:1.65rem!important}
+.fc .fc-timegrid-slot-label{vertical-align:top!important}
+.fc .fc-timegrid-event{min-height:0!important;overflow:hidden!important;
+  border-radius:5px!important;padding:1px 3px!important;
+  box-shadow:none!important}
+.fc .fc-timegrid-event .fc-event-main,
+.fc .fc-timegrid-event .fc-event-main-frame{overflow:hidden!important;
+  height:100%!important;padding:0 2px!important;display:block!important}
+.fc .fc-timegrid-event .fc-event-title{overflow:hidden!important;
+  white-space:normal!important;line-height:1.25!important;
+  max-height:100%!important;text-overflow:ellipsis!important;
+  overflow-wrap:break-word!important;font-size:12px!important}
+.fc .fc-timegrid-event .fc-event-time{font-size:10px!important;
+  line-height:1.2!important;font-weight:760!important}
+.fc .fc-timegrid-event.aaron-task-due{border-left:4px dashed #f8d06e!important;
+  outline:1px solid #f8d06e66!important}
+.fc .fc-daygrid-event.aaron-task-pin{border-left:4px solid #f9d57c!important;
+  margin:2px 3px!important;padding:4px 6px!important;
+  white-space:normal!important;overflow-wrap:anywhere!important}
+.fc .fc-daygrid-event.aaron-task-pin .fc-event-title{font-size:12px!important;
+  white-space:normal!important;line-height:1.35!important}
+.fc .fc-timegrid-axis-cushion{font-size:11px!important;font-weight:800!important}
+.fc .fc-timegrid-slot-label-cushion{font-variant-numeric:tabular-nums!important;
+  font-size:11px!important;font-weight:800!important}
+.fc .fc-timegrid-col.fc-day-today{background:#7166bb12!important}
 .fc .fc-col-header-cell-cushion{font-size:12px!important}
 .fc .fc-timegrid-axis,.fc .fc-timegrid-slot-label{min-width:58px}
 @media(max-width:850px){.fc .fc-toolbar-title{font-size:1.04rem}
