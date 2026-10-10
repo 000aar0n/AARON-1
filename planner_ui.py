@@ -391,9 +391,23 @@ def calendar_page():
             )
     today_items = daily_items(today)
     all_open = open_tasks()
-    st.caption("🎨 Color key: Blue · Google Calendar | Green · Winter Arc | "
-               "Teal · Events | Purple / Orange / Red · Assignment priority. "
-               "Change an item's color in its editor.")
+    # Every legend color comes from the trusted built-in palette.
+    keys = [
+        ("Google", "Blue"), ("Winter Arc", "Green"), ("Events", "Teal"),
+        ("Homework", "Purple"), ("High priority", "Orange"),
+        ("Urgent", "Red"),
+    ]
+    legend = "".join(
+        '<span style="display:inline-flex;align-items:center;gap:6px;'
+        'padding:5px 9px;margin:0 6px 6px 0;border:1px solid #344052;'
+        'border-radius:8px;font-size:12px;color:#e2e8f5">'
+        '<i style="display:inline-block;width:10px;height:10px;'
+        'border-radius:3px;background:' + EVENT_COLORS[color] + '"></i>'
+        + label + '</span>'
+        for label, color in keys
+    )
+    st.markdown(legend, unsafe_allow_html=True)
+    st.caption("Click any event or assignment to choose its own color.")
     a, b, c = st.columns(3)
     with a:
         metric("Open tasks", len(all_open), "Across your schedule")
