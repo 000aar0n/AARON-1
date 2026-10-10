@@ -1,7 +1,7 @@
 name: Verify AARON-1
 on:
   push:
-    branches: [main, master, 'fix/full-app-task-cleanup']
+    branches: [main, master]
   workflow_dispatch:
 
 permissions:
