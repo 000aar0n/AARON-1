@@ -4,6 +4,70 @@
 
 This version has replaced the sender/receiver, evolution, and sandbox-network experiments. Old experiment source files were removed. Files and checkpoints already saved on your computer under `data/` were **not deleted**; previously taught personal facts are migrated into the new task database.
 
+## 🪟 Windows 10/11 (no administrator privileges required)
+
+AARON-1 runs locally on **64-bit Windows 10 or Windows 11**, as well as
+macOS and Linux. It uses platform-neutral `pathlib` paths and saves private
+state under the repository's gitignored `data/` folder. Windows can import
+the original Google Calendar ICS/ZIP with correct timezone conversions
+(`tzdata` is installed on Windows).
+
+### Easiest Windows installation
+
+1. Install **64-bit Python 3.12** from
+   https://www.python.org/downloads/windows/ (3.11 also works).
+   Select **Add python.exe to PATH** if offered. No administrator rights are
+   needed if installing for your user account.
+2. Download/clone this repository from GitHub and extract it to a directory,
+   e.g. `%USERPROFILE%\\AARON-1`. Do **not** place private calendars in Git.
+3. **Double-click `setup_windows.cmd` once** to create `.venv-win` and
+   install the app requirements. Then **double-click `start_windows.cmd`**.
+   On first launch, `start_windows.cmd` also runs setup automatically if
+   the Windows virtual environment is missing.
+4. Open **http://localhost:8501**. Close AARON-1 with Ctrl+C in the launcher
+   window. It listens only on `127.0.0.1`, not your network.
+
+Or run this in **Windows Command Prompt**:
+
+```cmd
+cd /d "%USERPROFILE%\AARON-1"
+setup_windows.cmd
+start_windows.cmd
+```
+
+**Manual PowerShell alternative** (uses the same Python environment):
+
+```powershell
+cd "$HOME\AARON-1"
+py -3.12 -m venv .venv-win
+.\.venv-win\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv-win\Scripts\python.exe -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501
+```
+
+For Python 3.11, replace `py -3.12` with `py -3.11`.
+If `py` is not available but `python --version` is supported, use
+`python -m venv .venv-win` instead.
+
+**Pretrained chat and LoRA fine-tuning are optional** and require more
+dependencies. The planner, calendar, tasks, Gmail setup and rules-based
+assistant work with only `requirements.txt`. For local pretrained chat,
+first install a compatible PyTorch build using
+https://pytorch.org/get-started/locally/ (Windows CPU or NVIDIA CUDA), then:
+
+```cmd
+.venv-win\Scripts\python.exe -m pip install -r requirements-training.txt
+```
+
+On your AMD desktop, do not assume native Windows ROCm support for
+RX-series GPUs. CPU inference works without GPU acceleration; for advanced
+GPU training, use hardware- and OS-appropriate PyTorch instructions.
+
+**Important:** Each computer has its own local `data/` and chat history.
+GitHub syncs the **app code**, not your private task database or imported
+calendar. To move your personal data between Mac and Windows, make a local
+backup and transfer it privately; never commit `data/`, Google OAuth files,
+or exported ICS/ZIP files to the public repository.
+
 ## Run this version on your school Mac (no admin / Homebrew)
 
 If you already created `.venv312` using `uv`, **do not reinstall anything**.
