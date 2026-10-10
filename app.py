@@ -26,7 +26,7 @@ from training_ui import training_page
 from training_data import trained_model
 from trained_chat import inference_dependencies_ready
 
-APP_BUILD = "2026.10.10-verified-classes-v8"
+APP_BUILD = "2026.10.10-grounded-calendar-v9"
 
 st.set_page_config(page_title="AARON-1", page_icon="🤖", layout="wide")
 
@@ -180,9 +180,9 @@ def render_connections():
             "Import your Google Calendar export directly, including the ZIP "
             "download. Event times, durations, multi-day entries and recurring "
             "instances are preserved. This makes a local copy only; nothing "
-            "is uploaded to GitHub or changed in Google. School exports may "
-            "contain classes you DON'T take; confirm your own under "
-            "Planner → Review imported classes before relying on AI answers."
+            "is uploaded to GitHub or changed in Google. AARON-1 shows your "
+            "imported calendar events as saved, and its assistant answers "
+            "schedule questions from actual stored event records, not guesses."
         )
         google_file = st.file_uploader(
             "Google Calendar export (.ics or .zip)",
@@ -396,7 +396,7 @@ def main():
 
     install_theme()
     header()
-    st.caption("AARON-1 build " + APP_BUILD + " · Readable class titles and verified personal schedule")
+    st.caption("AARON-1 build " + APP_BUILD + " · Full class calendar and source-grounded AI schedules")
 
     # Google returns to this same local dashboard after the user approves OAuth.
     if "code" in st.query_params or "error" in st.query_params:
