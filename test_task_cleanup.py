@@ -150,6 +150,50 @@ class TaskCleanupTests(unittest.TestCase):
             button.key == "priorities_bulk_delete" for button in at.button
         ))
 
+    def test_full_app_no_duplicate_keys_after_repeated_editor_changes(self):
+        self.seed_data()
+        at = self._run_app()
+        # Reproduces the user's exact nonce=4 duplicate-key crash.
+        at.session_state["planner_editor_nonce"] = 4
+        at.run()
+        self.assertEqual(
+            len(at.exception), 0,
+            repr([e.message for e in at.exception])
+        )
+        segmented = [widget.key for widget in at.get("segmented_control")]
+        self.assertIn("calendar_planner_4_type", segmented)
+        self.assertIn("priorities_planner_4_type", segmented)
+
+    def test_cancel_single_delete_does_not_remove_task(self):
+        target, *_ = self.seed_data()
+        at = self._run_app()
+        at.button(key=f"priorities_all_delete_{target}").click().run()
+        self.assertIsNotNone(planner.get_item(target))
+        at.button(key="priorities_cancel_single_delete").click().run()
+        self.assertEqual(len(at.exception), 0)
+        self.assertIsNotNone(planner.get_item(target))
+
+    def test_full_app_multiple_trainer_runs_and_many_widgets(self):
+        self.seed_data()
+        for i in range(24):
+            planner.create_item(
+                title=f"Personal task #{i}", due="2026-10-20",
+                priority=4 if i % 3 == 0 else 2,
+            )
+        for i in range(10):
+            training_data.add_example(
+                f"What's your response to prompt {i}?",
+                f"Personalized reply for prompt {i}!"
+            )
+        for epochs in (2, 3):
+            job = training_data.create_job(epochs=epochs)
+            training_data.update_job(
+                job["id"], status="failed", error="Test-only job"
+            )
+            log = training_data.JOB_HOME / (job["id"] + ".log")
+            log.write_text("Test-only diagnostic log", encoding="utf-8")
+        self._run_app()
+
     def test_delete_task_via_buttons_then_clear_remaining_manual_tasks(self):
         first, completed, old, imported, email, event = self.seed_data()
         at = self._run_app()
