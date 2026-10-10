@@ -250,7 +250,9 @@ def trained_model():
         adapter = (MODEL_HOME / validate_job_id(entry["job_id"]) / "adapter").resolve()
         if base in ALLOWED_BASE_MODELS and adapter.is_dir() and (
             adapter / "adapter_config.json"
-        ).is_file() and adapter.is_relative_to(MODEL_HOME.resolve()):
+        ).is_file() and (adapter / "adapter_model.safetensors").is_file() and (
+            adapter.is_relative_to(MODEL_HOME.resolve())
+        ):
             return {"base_model": base, "adapter": str(adapter),
                     "job_id": entry["job_id"]}
     except (OSError, KeyError, ValueError, TypeError):
@@ -263,7 +265,9 @@ def activate_trained(job_id):
     if not job or job.get("status") != "completed":
         raise ValueError("Only completed fine-tunings can be activated")
     directory = (MODEL_HOME / validate_job_id(job_id) / "adapter").resolve()
-    if not (directory / "adapter_config.json").is_file():
+    if not (directory / "adapter_config.json").is_file() or not (
+        directory / "adapter_model.safetensors"
+    ).is_file():
         raise ValueError("Adapter weights are missing")
     atomic_json(ACTIVE_MODEL, {
         "job_id": job_id, "base_model": job["base_model"],
