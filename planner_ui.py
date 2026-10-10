@@ -9,8 +9,9 @@ from streamlit_calendar import calendar
 
 from assistant_core import learn_priority
 from planner import (
-    PRIORITY_NAMES, calendar_events, create_item, daily_items, delete_item,
-    get_item, items_for_calendar, next_actions, open_tasks, toggle_complete,
+    PRIORITY_NAMES, all_tasks, calendar_events, clear_manually_added_tasks,
+    create_item, daily_items, delete_item, get_item, items_for_calendar,
+    manually_added_task_count, next_actions, open_tasks, toggle_complete,
     update_item, set_priority,
 )
 
@@ -388,6 +389,79 @@ def calendar_page():
                     st.rerun()
 
 
+
+def _task_delete_controls():
+    """List-only delete flow with explicit per-task confirmation."""
+    item_id = st.session_state.get("planner_pending_delete_id")
+    if not item_id:
+        return
+    item = get_item(item_id)
+    if not item or (item.get("item_type") or "task") != "task":
+        st.session_state.pop("planner_pending_delete_id", None)
+        return
+    st.warning("Delete task **" + html.escape(item["title"]) + "**? "
+               "This deletes the local task, not its school/email source.")
+    confirm, cancel = st.columns(2)
+    if confirm.button(
+        "Yes, delete task", key="priorities_confirm_single_delete",
+        type="primary", use_container_width=True,
+    ):
+        delete_item(item_id)
+        st.session_state.pop("planner_pending_delete_id", None)
+        if st.session_state.get("planner_editor_id") == item_id:
+            _new_item(kind="task")
+        st.toast("Task deleted")
+        st.rerun()
+    if cancel.button(
+        "Cancel", key="priorities_cancel_single_delete",
+        use_container_width=True,
+    ):
+        st.session_state.pop("planner_pending_delete_id", None)
+        st.rerun()
+
+
+def _clear_manual_tasks_panel():
+    """A deliberate bulk action; imported tasks and calendar events survive."""
+    count = manually_added_task_count()
+    with st.expander("🗑 Clear all tasks I added", expanded=False):
+        st.markdown(f"**{count} manually added task(s)** (including completed tasks)")
+        st.caption(
+            "This removes ONLY tasks created manually in AARON-1, including "
+            "tasks added through chat. It does NOT delete imported school "
+            "assignments, email-derived tasks, calendar events, memories, "
+            "training examples, or chat history. A backup is saved locally first."
+        )
+        if count == 0:
+            st.info("There are no manually added tasks to clear.")
+            return
+        confirmed = st.checkbox(
+            f"Yes, remove all {count} manually added tasks",
+            key="priorities_confirm_bulk_delete",
+        )
+        if st.button(
+            f"Delete my {count} tasks",
+            key="priorities_bulk_delete",
+            type="primary", use_container_width=True,
+            disabled=not confirmed,
+        ):
+            try:
+                deleted, backup = clear_manually_added_tasks(
+                    expected_count=count
+                )
+                st.session_state["planner_editor_id"] = None
+                st.session_state["planner_editor_nonce"] = (
+                    st.session_state.get("planner_editor_nonce", 0) + 1
+                )
+                st.session_state.pop("planner_pending_delete_id", None)
+                st.session_state["planner_clear_feedback"] = (
+                    f"Deleted {deleted} manually added tasks. "
+                    f"Backup saved at: {backup}"
+                )
+                st.rerun()
+            except (ValueError, OSError) as exc:
+                st.error(f"Could not clear the tasks: {exc}")
+
+
 def tasks_page():
     from ui_theme import page_heading, metric
     page_heading("Do the right thing next", "Task priorities",
@@ -410,14 +484,28 @@ def tasks_page():
                    "shown for every recommendation.")
         _action_list(limit=12, scope="priorities")
         st.divider()
-        with st.expander("All open tasks"):
-            for task in open_tasks():
-                a, b, c = st.columns([5, 1, 1.3])
-                a.write(task["title"])
+        with st.expander("All tasks · including completed"):
+            tasks = all_tasks()
+            if not tasks:
+                st.caption("No tasks saved. Add one from Planner or Chat.")
+            for task in tasks:
+                a, b, c, d = st.columns([4, 1.4, 1, 1.2])
+                title = ("✓ " if task.get("completed") else "") + task["title"]
+                a.write(title)
                 b.caption(_format_deadline(task))
-                if c.button("Edit", key=f"all_edit_{task['id']}"):
+                if c.button("Edit", key=f"priorities_all_edit_{task['id']}"):
                     _choose_item(task["id"])
                     st.rerun()
+                if d.button(
+                    "Delete", key=f"priorities_all_delete_{task['id']}",
+                    use_container_width=True,
+                ):
+                    st.session_state["planner_pending_delete_id"] = task["id"]
+                    st.rerun()
+            _task_delete_controls()
+        if st.session_state.get("planner_clear_feedback"):
+            st.success(st.session_state.pop("planner_clear_feedback"))
+        _clear_manual_tasks_panel()
         st.caption("Marking a task important also trains AARON-1's local "
                    "personal ranking model.")
     with edit_col:
