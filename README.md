@@ -1,6 +1,6 @@
 # 🤖 AARON-1 — your personal assistant
 
-**One assistant. Four tabs. No agent network or API fees. Local conversational AI is optional.**
+**One assistant. Five tabs. Persistent memory, tools and a genuinely fine-tunable local conversational model.**
 
 This version has replaced the sender/receiver, evolution, and sandbox-network experiments. Old experiment source files were removed. Files and checkpoints already saved on your computer under `data/` were **not deleted**; previously taught personal facts are migrated into the new task database.
 
@@ -8,7 +8,7 @@ This version has replaced the sender/receiver, evolution, and sandbox-network ex
 
 - **🗓️ Planner:** an interactive FullCalendar view with **Month / Week / Day / Agenda**, clickable timed events and task deadlines, descriptions, due times, event lengths, and a quick editor. No Google Calendar account/sync is required; this is the local AARON-1 calendar, styled and operated like Google Calendar.
 - **🎯 Priorities:** "What should I do next?" ordered by the actual time due, a 1–4 priority level you set, your feedback, and estimated work time. Each task gives a readable reason, not an unexplained AI score.
-- **💬 Conversation:** talk about your day, ask what's due, or create tasks in chat. Optional **Ollama** enables much more natural, multi-turn local conversations. The pretrained Ollama model only handles language — AARON-1 owns your tasks, context and explicit actions.
+- **💬 Conversation:** talk about your day, ask what's due, or create tasks in chat. Use Ollama OR your own fine-tuned LoRA adapter for natural multi-turn replies. AARON-1 still owns its tasks, memory and approved tool actions.\n- **🧠 Train AARON-1:** explicitly approve example replies, fine-tune a small pretrained Qwen2.5 model's LoRA weights, compare held-out losses, and activate the trained adapter in Chat.
 - **💬 Chat:** simple commands like `what homework is due`, `add task read chapter 3`, `check my email`, or `my favorite subject is chemistry`.
 - **✅ Task controls:** add, edit, prioritize, finish and reopen tasks. New entries can have descriptions, dates, clock times and effort estimates. The **Important** action also teaches the local priority model.
 - **🔗 Connect:** import school assignments from an .ics calendar export or .csv file. Optionally authorize a personal **Gmail** account using Google's own OAuth sign-in, with **read-only** Gmail access. Browse inbox subjects and snippets, search school-related email, and explicitly add a message as a task.
@@ -27,7 +27,7 @@ python3 -m pip install --upgrade -r requirements.txt
 python3 -m streamlit run app.py
 ```
 
-Refresh your existing browser tab at http://localhost:8501. The interface uses a dark, minimalist style and shows **Planner**, **Priorities**, **Chat**, and **Connections** tabs. You no longer need to start `trainer.py`, `evolution.py`, or any other background training process. Use Ctrl+C in the existing Streamlit Terminal to stop before rerunning.
+Refresh your existing browser tab at http://localhost:8501. The interface uses a dark, minimalist style and shows **Planner**, **Priorities**, **Chat**, **Train AARON-1**, and **Connections** tabs. You no longer need to start `trainer.py`, `evolution.py`, or any other background training process. Use Ctrl+C in the existing Streamlit Terminal to stop before rerunning.
 
 First-time install:
 
@@ -103,3 +103,54 @@ In **Chat → Conversation settings**, you can pick from installed local [Ollama
 Without Ollama you can still ask `what should I do next?`, `what homework is due`, `what is on my schedule tomorrow`, or say `add task chemistry homework due tomorrow at 5pm`. AARON-1's fallback conversation remains limited; it doesn't pretend otherwise.
 
 **Tests:** `python3 -m unittest -v test_assistant.py test_planner.py`.
+
+## 🧠 Train AARON-1 — actual model fine-tuning
+
+AARON-1 can now use a **partially trained but still trainable model**. The starting point is [Qwen2.5-0.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct) (or an optional 1.5B version). This is an existing open-weight language model; **you are not training billions of parameters from scratch**. The optional **PyTorch + PEFT LoRA** implementation trains adapter weights using gradient descent from examples you approve.
+
+### Setup on the Mac currently running AARON-1
+
+Start your existing Streamlit app as before. To enable real training and trained-adapter inference, stop Streamlit first (`Control+C`) and run:
+
+```bash
+cd ~/AARON-1
+git pull
+source .venv/bin/activate
+python3 -m pip install --upgrade -r requirements.txt
+python3 -m pip install -r requirements-training.txt
+python3 -m streamlit run app.py --server.address 127.0.0.1
+```
+
+The training dependencies are optional and significantly larger than the basic application dependencies. The 0.5B starter model downloads from Hugging Face the first time it is trained or loaded. On an M-series Mac, PyTorch's MPS may work; otherwise it can train on CPU more slowly. AARON-1 does not silently access an external API to run inference.
+
+### How to train it in the dashboard
+
+1. Open **Train AARON-1**. Write pairs such as **When I say:** `I have a chemistry quiz tomorrow` → **Preferred answer:** `Let's knock out the hardest concepts first. What topics are on it?` and click **Save approved example**. You can also choose an existing chat message, edit the response, and explicitly approve that pair.
+2. Approve at least **8 distinct prompt/response examples**. **30–100+ varied examples** are much more useful and less prone to memorization.
+3. Choose **Qwen2.5 0.5B**, set training passes (default 3), then click **Train AARON-1 on this computer**. This starts a local worker and updates a *new* LoRA adapter; it never edits your original downloaded base weights.
+4. Refresh training status to see the local run log, training loss and **held-out validation loss before and after**. Compare on actual prompts too: a lower loss on just a few validation examples does not establish that the model is generally better.
+5. Click **Use this fine-tuned AARON-1**, then open **Chat → Conversation settings** and select **AARON-1 (fine-tuned)**. Chat loads the adapter with the exact corresponding base model.
+
+Training examples, frozen job snapshots, weights, job logs and token files are all saved under **`data/`**, already excluded from Git. **No Gmail, Blackbaud, or chat contents are automatically added to the training dataset.** Export approved examples from the Train tab if you deliberately want to move them to another computer. Correcting an already approved prompt replaces its older target for subsequent training; it does not undo its effect on previously trained adapters.
+
+Important distinction: **Your calendar facts and task list are still stored separately in SQLite**. Fine-tuning teaches conversational *behavior and style*, not up-to-the-minute school assignments. AARON-1 injects approved local memory and upcoming tasks into conversational context each time. Calendar/email operations are explicit verified application actions, not model hallucinations.
+
+### Train on your gaming PC (AMD Radeon RX 9060 XT)
+
+The **GPU machine must host the training worker** (it isn't accessed remotely from ChatGPT or the Mac). To carry the approved dataset over, use **Train → Export training examples**, copy that private JSONL file to your PC, then use **Train → Import** there.
+
+AMD's 2026 [PyTorch on Windows 7.2.1 compatibility announcement](https://www.amd.com/en/resources/support-articles/release-notes/RN-AMDGPU-WINDOWS-PYTORCH-7-2-1.html) explicitly lists the RX 9060 XT. But you need a compatible **Windows 11 / Python 3.12 / driver / ROCm PyTorch** combination; simply running `pip install torch` doesn't guarantee GPU training. Use AMD's [PyTorch installation instructions](https://rocm.docs.amd.com/projects/radeon-ryzen/en/latest/docs/install/installrad/windows/install-pytorch.html) for the correct wheels first, then install `requirements-training.txt` in that same environment.
+
+Alternatively a supported Linux ROCm configuration may be used. Python 3.14 or old AMD drivers may not have compatible wheels. Test `python -c "import torch; print(torch.cuda.is_available(), torch.version.hip)"` on the PC before starting a substantial run. AARON-1 uses CUDA-compatible PyTorch calls for AMD ROCm too.
+
+To run the dashboard on a separately configured PC, clone the repository, activate the correct virtual environment, install basic and training requirements, and start `python -m streamlit run app.py --server.address 127.0.0.1`. The first run imports approved examples using your manually transferred JSONL. No existing Mac database is magically synced to the PC.
+
+### Engineering and privacy details
+
+- The training pipeline uses LoRA on Qwen attention projections, with the **system/user prefix masked out of the loss**. Only assistant target tokens receive gradient updates.
+- The split keeps **20% of approved pairs (minimum 2)** aside for evaluation; training never silently uses held-out examples.
+- The frozen dataset, adapter checkpoints and `active_finetune.json` remain local; you can switch to a base model any time.
+- The local model can discuss your schedule. It **does not get unrestricted file, Gmail, or internet access**, nor can it automatically modify your calendar by writing arbitrary generated text.
+- Fine-tuning is an explicitly initiated, compute-intensive action. It is *not* continuous self-modification, and quality is not guaranteed. Keep a backup of important private data and avoid running an unprotected Streamlit instance over the public internet.
+
+**Offline tests:** `python3 -m unittest -v test_assistant.py test_planner.py test_training.py`. These test the fine-tuning control flow, data isolation, prompt masking, and adapter selection **without downloading or actually training a large neural model**. You must execute at least one real training run locally before claiming GPU compatibility and real-world quality.
