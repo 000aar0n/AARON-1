@@ -455,71 +455,6 @@ def _calendar_editor_dialog():
         st.rerun()
 
 
-def _readable_week_agenda():
-    """A true full-title fallback, independent of FullCalendar's iframe sizing.
-
-    Each item is an actual Streamlit button with auto-wrapping text. This
-    makes even heavily-overlapping classes and 150-character event names
-    readable without opening popups just to identify them.
-    """
-    st.markdown("#### 📖 Every title, fully readable")
-    chosen_day = st.date_input(
-        "Show events for the week containing",
-        value=date.today(),
-        key="planner_readable_week_date",
-    )
-    start = chosen_day - timedelta(days=chosen_day.weekday())
-    st.caption(
-        f"{start.strftime('%b %d')} – "
-        f"{(start + timedelta(days=6)).strftime('%b %d, %Y')} · "
-        "Click any full event name to open it. Scroll within this list."
-    )
-    any_events = False
-    with st.container(
-        height=390, border=True, key="planner_readable_titles_window"
-    ):
-        for offset in range(7):
-            day = start + timedelta(days=offset)
-            items = daily_items(day)
-            if not items:
-                continue
-            any_events = True
-            st.markdown(f"**{day.strftime('%A, %b %d')}**")
-            for item in items:
-                color_name = effective_color_name(item)
-                color = EVENT_COLORS[color_name]
-                when = (
-                    _safe_clock(item["due_time"]).strftime("%I:%M %p").lstrip("0")
-                    if item.get("due_time") else "All day"
-                )
-                c_time, c_name = st.columns([1.15, 7], gap="small")
-                with c_time:
-                    # Color from the fixed, validated application palette only.
-                    st.markdown(
-                        '<div style="margin-top:11px;font-size:12px;'
-                        'font-weight:750;white-space:normal;color:' +
-                        color + ';">● ' + html.escape(when) + '</div>',
-                        unsafe_allow_html=True,
-                    )
-                with c_name:
-                    display_title = str(item["title"])
-                    if item.get("completed"):
-                        display_title = "✓ " + display_title
-                    if item.get("repeat_weekly"):
-                        display_title = "↻ " + display_title
-                    event_ref = item["id"]
-                    if item.get("repeat_weekly"):
-                        event_ref += "::" + day.isoformat()
-                    if st.button(
-                        display_title, key=f"planner_read_full_{day.isoformat()}_{item['id']}",
-                        use_container_width=True,
-                    ):
-                        _open_calendar_popup(item_id=event_ref)
-            st.divider()
-        if not any_events:
-            st.info("No events or assignments this week.")
-
-
 def calendar_page():
     from ui_theme import page_heading, metric
     page_heading(
@@ -570,8 +505,9 @@ def calendar_page():
     ):
         _open_calendar_popup(kind="event")
     hint.caption(
-        "**Readable Week** shows complete names in stacked event cards. "
-        "Use **Hour Grid** when you want a time-of-day layout."
+        "One weekly timeline: classes are placed at their exact start times. "
+        "Tasks stay in the top all-day row, and timed deadlines also show "
+        "at their exact time."
     )
 
     # Full-width calendar. Weekly occurrences are expanded only for the
@@ -584,59 +520,70 @@ def calendar_page():
     )
     selected_event_id = st.session_state.get("planner_highlight_id")
     if selected_event_id:
+        # A timed task has TWO visible tiles but ONE underlying task:
+        # highlight the all-day reminder and exact due-time marker together.
+        selected_base = str(selected_event_id).split("::", 1)[0]
         for calendar_event in all_events:
-            if calendar_event["id"] == selected_event_id:
-                calendar_event["classNames"] = ["aaron-event-selected"]
+            same_tile = calendar_event["id"] == selected_event_id
+            same_task = (
+                calendar_event["extendedProps"]["kind"] == "task"
+                and calendar_event["extendedProps"]["seriesId"] == selected_base
+            )
+            if same_tile or same_task:
+                calendar_event["classNames"] = [
+                    *calendar_event.get("classNames", []),
+                    "aaron-event-selected",
+                ]
     options = {
-        # The hour-grid has short blocks that physically cannot fit class
-        # titles. Show full-height stacked class cards by default instead.
-        "initialView": "dayGridWeek",
+        # One chronological week. FullCalendar computes the vertical position
+        # from each actual minute (08:10, 09:05, etc.), not a rough time slot.
+        "initialView": "timeGridWeek",
+        "timeZone": "local",
         "headerToolbar": {
             "left": "today prev,next",
             "center": "title",
-            "right": "dayGridWeek,timeGridWeek,dayGridMonth,timeGridDay,listWeek",
+            "right": "timeGridWeek,timeGridDay,dayGridMonth,listWeek",
         },
         "views": {
-            "dayGridWeek": {
-                "buttonText": "Readable Week",
-                "dayMaxEventRows": False,
-            },
+            "timeGridWeek": {"buttonText": "Week"},
+            "timeGridDay": {"buttonText": "Day"},
             "dayGridMonth": {
-                "buttonText": "Month",
-                "dayMaxEventRows": 5,
+                "buttonText": "Month", "dayMaxEventRows": 5,
                 "fixedWeekCount": False,
             },
-            "timeGridWeek": {
-                "buttonText": "Hour Grid",
-                "slotMinTime": "06:00:00",
-                "slotMaxTime": "23:00:00",
-            },
-            "timeGridDay": {"buttonText": "Day"},
             "listWeek": {"buttonText": "Agenda"},
         },
         "firstDay": 1,
-        # Let full-name rows grow; a fixed 980px clips heavily booked days.
-        "height": "auto",
-        "expandRows": True,
+        "height": 1000,
         "nowIndicator": True,
         "editable": False,
         "selectable": True,
         "selectMirror": True,
         "navLinks": True,
+        # Don't conceal a clashing class or a timed homework deadline.
         "slotEventOverlap": False,
-        "eventMinHeight": 34,
-        "eventShortHeight": 42,
+        "eventOverlap": False,
+        # All-day tasks are in the HEADER. Timed tasks additionally receive
+        # a separate 15-minute DUE marker on the hourly timeline.
+        "allDaySlot": True,
+        "allDayText": "TASKS",
+        "dayMaxEvents": False,
+        "eventMinHeight": 16,
+        "eventShortHeight": 18,
         "eventTimeFormat": {
             "hour": "numeric", "minute": "2-digit", "meridiem": "short"
         },
-        "slotMinTime": "06:00:00",
-        "slotMaxTime": "23:00:00",
+        "slotMinTime": "00:00:00",
+        "slotMaxTime": "24:00:00",
         "slotDuration": "00:30:00",
-        "scrollTime": "08:00:00",
-        "allDaySlot": True,
-        "dayMaxEvents": False,
+        "slotLabelInterval": "01:00:00",
+        "slotLabelFormat": {
+            "hour": "numeric", "minute": "2-digit", "meridiem": "short"
+        },
+        "scrollTime": "07:00:00",
         "moreLinkClick": "popover",
         "eventDisplay": "block",
+        "eventOrder": "start,-duration,title",
         "buttonText": {
             "today": "Today", "month": "Month", "week": "Week",
             "day": "Day", "list": "Agenda"
@@ -649,7 +596,8 @@ def calendar_page():
         callbacks=["dateClick", "eventClick", "select"],
         # New key intentionally resets persisted Week/Hour-Grid selection
         # from older versions so the readable view is actually displayed.
-        key="aaron_planner_calendar_readable_v8",
+        # A fresh key resets the previous stacked-week selection on upgrade.
+        key="aaron_planner_aligned_week_v10",
     )
     if isinstance(result, dict):
         callback = result.get("callback")
@@ -683,14 +631,11 @@ def calendar_page():
             st.session_state.pop("planner_last_click", None)
 
     st.caption(
-        "The default Readable Week view stacks events with their full titles "
-        "instead of squeezing them into tiny hour blocks. Hour Grid is still "
-        "available. Click a class or assignment to open its details."
+        "One weekly timetable: classes line up with the exact clock time on "
+        "the left; all tasks are in the top TASKS row. Tasks with a due time "
+        "also appear as a DUE marker at that time. Click either copy to open "
+        "the same task. Linked assignments remain accessible from their class."
     )
-
-    # Full titles remain accessible even when the embedded time-grid can't
-    # display them because a scheduled event is too short or overlaps another.
-    _readable_week_agenda()
 
     # Keep the planner itself uncluttered; supporting panels sit BELOW it.
     with st.expander("🎯 Your next moves", expanded=False):
