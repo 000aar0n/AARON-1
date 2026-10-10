@@ -126,16 +126,13 @@ def _date_values(component, field):
 
 
 def _within_window(start, end, window_start, window_end):
-    first = start.date() if isinstance(start, datetime) else start
-    last = end.date() if isinstance(end, datetime) else end
-    # Google uses exclusive DTEND for all-day events.
-    exclusive_end = (end if not isinstance(start, datetime) else
-                     end + timedelta(microseconds=1))
-    if isinstance(exclusive_end, datetime):
-        end_day = exclusive_end.date()
-    else:
-        end_day = exclusive_end
-    return first < window_end and end_day >= window_start
+    # Event times and Google's all-day DTEND are both exclusive at the end.
+    # Don't pull in a vacation that finished before the chosen start date.
+    if isinstance(start, datetime) and isinstance(end, datetime):
+        lower = datetime.combine(window_start, time.min, tzinfo=LOCAL_TZ)
+        upper = datetime.combine(window_end, time.min, tzinfo=LOCAL_TZ)
+        return start < upper and end > lower
+    return start < window_end and end > window_start
 
 
 def _record(component, *, actual_start, span, calendar_id, uid, original_start,
