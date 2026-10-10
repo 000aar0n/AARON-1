@@ -141,14 +141,14 @@ def _read_calendar_question(lower, today):
     if title_query:
         name = title_query.group(1).strip()
         name = re.sub(
-            r"^(?:(?:my|the|next|first|upcoming)\\s+)+", "", name
+            r"^(?:(?:my|the|next|first|upcoming)\s+)+", "", name
         ).strip()
         if not name or name in ("class", "classes", "event", "events"):
             return None
         matches = find_upcoming_title(name, today=today)
         if not matches:
             short = re.sub(
-                r"\\s+(?:class|event|meeting|lesson)$", "", name
+                r"\s+(?:class|event|meeting|lesson)$", "", name
             ).strip()
             if short != name:
                 matches = find_upcoming_title(short, today=today)
