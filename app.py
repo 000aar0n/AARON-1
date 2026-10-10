@@ -22,6 +22,8 @@ from ui_theme import install_theme, header, page_heading
 from planner_ui import calendar_page, tasks_page
 from planner import ensure_schema
 from assistant_conversation import respond, local_models
+from training_ui import training_page
+from training_data import trained_model
 
 st.set_page_config(page_title="AARON-1", page_icon="🤖", layout="wide")
 
@@ -208,34 +210,44 @@ def render_chat():
         "when you enable a local chat model.",
     )
     with st.expander("🧠 Conversation settings", expanded=False):
-        available = available_local_models()
-        if available:
-            options = ["Planner only (rules)"] + available
-            current = st.session_state.get("aaron_selected_chat_model")
-            choice = st.selectbox(
-                "Conversation engine", options,
-                index=(options.index(current) if current in options else 1),
-                help="A local model handles open-ended language. Planner actions "
-                     "always use AARON-1's saved tasks and verified commands.",
-                key="aaron_model_picker",
-            )
-            st.session_state["aaron_selected_chat_model"] = (
-                None if choice == "Planner only (rules)" else choice
-            )
-            st.success("Local conversation enabled" if choice != options[0]
-                       else "Using basic rules only")
+        active_adapter = trained_model()
+        ollama_options = available_local_models()
+        options = (["Planner only (rules)"] +
+                   (["AARON-1 (fine-tuned)"] if active_adapter else []) +
+                   ollama_options)
+        current = st.session_state.get("aaron_selected_chat_model")
+        current_label = ("AARON-1 (fine-tuned)" if current == "__aaron_trained__"
+                         else current if current in options else None)
+        if current_label not in options:
+            current_label = ("AARON-1 (fine-tuned)" if active_adapter
+                             else ollama_options[0] if ollama_options
+                             else options[0])
+        if st.session_state.get("aaron_model_picker") not in options:
+            st.session_state.pop("aaron_model_picker", None)
+        choice = st.selectbox(
+            "Conversation engine", options,
+            index=options.index(current_label),
+            help="Only explicit planner commands can change assignments. "
+                 "Language model replies cannot silently take actions.",
+            key="aaron_model_picker",
+        )
+        st.session_state["aaron_selected_chat_model"] = (
+            "__aaron_trained__" if choice == "AARON-1 (fine-tuned)"
+            else None if choice == "Planner only (rules)"
+            else choice
+        )
+        if choice == "AARON-1 (fine-tuned)":
+            st.success("Fine-tuned AARON-1 is active. Your local LoRA adapter "
+                       "loads on the first conversation.")
+        elif choice in ollama_options:
+            st.success("Local Ollama conversation enabled")
         else:
-            st.session_state["aaron_selected_chat_model"] = None
-            st.info(
-                "For full back-and-forth conversations, install Ollama on this "
-                "computer and download a small local model. The planner and "
-                "task commands already work without it."
-            )
+            st.info("Using basic rule-based chat. For full conversations, "
+                    "fine-tune AARON-1 in Train or install Ollama.")
+        if not ollama_options and not active_adapter:
+            st.caption("Optional pretrained conversational baseline:")
             st.code("ollama pull qwen2.5:3b", language="bash")
-            st.caption("Ollama must be running locally at 127.0.0.1:11434. "
-                       "This option uses a pretrained open model for language, "
-                       "not a neural model AARON-1 trained from scratch.")
-        if st.button("Check for local models", key="refresh_local_models"):
+        if st.button("Refresh local models", key="refresh_local_models"):
             available_local_models.clear()
             st.rerun()
 
@@ -295,8 +307,8 @@ def main():
             st.query_params.clear()
             st.error(f"Gmail connection failed: {exc}")
 
-    calendar_tab, task_tab, chat_tab, connection_tab = st.tabs(
-        ["Planner", "Priorities", "Chat", "Connections"]
+    calendar_tab, task_tab, chat_tab, train_tab, connection_tab = st.tabs(
+        ["Planner", "Priorities", "Chat", "Train AARON-1", "Connections"]
     )
     with calendar_tab:
         render_calendar()
@@ -304,6 +316,8 @@ def main():
         render_tasks()
     with chat_tab:
         render_chat()
+    with train_tab:
+        training_page(messages(limit=120))
     with connection_tab:
         render_connections()
 
