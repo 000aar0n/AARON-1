@@ -101,7 +101,7 @@ def train(job_id):
         AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments,
         set_seed,
     )
-    from peft import LoraConfig, TaskType, get_peft_model
+    from peft import LoraConfig, TaskType, get_peft_model, PeftModel
 
     set_seed(42)
     cuda = bool(torch.cuda.is_available())  # Also true for ROCm PyTorch.
@@ -120,12 +120,27 @@ def train(job_id):
         base, torch_dtype=dtype, trust_remote_code=False,
     )
     model.config.use_cache = False
-    config = LoraConfig(
-        r=8, lora_alpha=16, lora_dropout=0.05, bias="none",
-        task_type=TaskType.CAUSAL_LM,
-        target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
-    )
-    model = get_peft_model(model, config)
+    previous_id = job.get("parent_job_id")
+    if previous_id:
+        previous_id = validate_job_id(previous_id)
+        previous = read_job(previous_id)
+        previous_adapter = MODEL_HOME / previous_id / "adapter"
+        if (not previous or previous.get("status") != "completed" or
+                previous.get("base_model") != base or
+                not (previous_adapter / "adapter_model.safetensors").is_file()):
+            raise ValueError("Previous adapter is missing or incompatible")
+        model = PeftModel.from_pretrained(
+            model, str(previous_adapter), is_trainable=True
+        )
+        print(f"Continuing adapter training from {previous_id[:12]}", flush=True)
+    else:
+        config = LoraConfig(
+            r=8, lora_alpha=16, lora_dropout=0.05, bias="none",
+            task_type=TaskType.CAUSAL_LM,
+            target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
+        )
+        model = get_peft_model(model, config)
+        print("Starting a new LoRA adapter from the pretrained base.", flush=True)
     model.print_trainable_parameters()
 
     class Samples(Dataset):
@@ -191,6 +206,7 @@ def train(job_id):
 
     report = {
         "base_model": base, "device": accelerator,
+        "continued_from": previous_id,
         "train_loss": float(result.training_loss),
         "baseline_eval_loss": float(baseline.get("eval_loss", float("nan"))),
         "eval_loss": float(metrics.get("eval_loss", float("nan"))),
