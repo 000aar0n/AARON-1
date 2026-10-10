@@ -9,6 +9,7 @@ import assistant_core as core
 import assistant_conversation as conversation
 import training_data as data
 import train_aaron
+import trained_chat
 
 
 class FakeTokenizer:
@@ -152,6 +153,36 @@ class TrainingDataTests(unittest.TestCase):
         # No adapter files => refusal instead of arbitrary path loading.
         with self.assertRaises(ValueError):
             data.activate_trained(job["id"])
+
+    def test_pretrained_mode_dispatches_without_ollama(self):
+        self._populate(8)
+        with (patch("trained_chat.generate_base",
+                    return_value="Hello, this is my pretrained model") as native,
+              patch.object(conversation, "urlopen",
+                           side_effect=AssertionError("Ollama must not be called"))):
+            result, acted = conversation.respond(
+                "Tell me about the solar system",
+                previous=[{"role": "user", "message": "We are studying space"}],
+                model="__aaron_base__",
+            )
+        self.assertEqual(result, "Hello, this is my pretrained model")
+        self.assertFalse(acted)
+        self.assertTrue(native.called)
+
+    def test_base_inference_uses_supported_local_model_only(self):
+        with patch("trained_chat._generate", return_value="test") as inference:
+            result = trained_chat.generate_base([
+                {"role": "user", "content": "Hello"}
+            ])
+        self.assertEqual(result, "test")
+        kwargs = inference.call_args.kwargs
+        self.assertEqual(kwargs["base"], data.BASE_MODEL)
+        self.assertIsNone(kwargs["adapter"])
+        with self.assertRaises(ValueError):
+            trained_chat.generate_base(
+                [{"role": "user", "content": "Hello"}],
+                base_model="random/untrusted-model"
+            )
 
     def test_trained_mode_dispatches_without_ollama_call(self):
         self._populate(8)
