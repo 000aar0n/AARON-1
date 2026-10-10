@@ -618,7 +618,11 @@ def _readable_week_agenda():
                     )
                 with c_name:
                     display_title = str(item["title"])
-                    if item.get("completed"):
+                    if item.get("source") == "google_calendar" and (
+                        item.get("personal_status") != "mine"
+                    ):
+                        display_title = "⚠ UNVERIFIED · " + display_title
+                    elif item.get("completed"):
                         display_title = "✓ " + display_title
                     if item.get("repeat_weekly"):
                         display_title = "↻ " + display_title
