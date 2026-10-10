@@ -508,7 +508,8 @@ def tasks_page():
                 ):
                     st.session_state["planner_pending_delete_id"] = task["id"]
                     st.rerun()
-            _task_delete_controls()
+        # Keep confirmation visible even if Streamlit closes the list expander.
+        _task_delete_controls()
         if st.session_state.get("planner_clear_feedback"):
             st.success(st.session_state.pop("planner_clear_feedback"))
         _clear_manual_tasks_panel()
