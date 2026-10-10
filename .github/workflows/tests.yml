@@ -1,7 +1,7 @@
 name: Verify AARON-1
 on:
   push:
-    branches: [main, master, 'feature/calendar-planner-v2']
+    branches: [main, master]
   workflow_dispatch:
 
 permissions:
@@ -20,5 +20,4 @@ jobs:
       - name: Check Python syntax
         run: python -m compileall -q app.py assistant_core.py gmail_access.py avatar.py test_assistant.py planner.py planner_ui.py assistant_conversation.py test_planner.py
       - name: Run offline regression tests
-        continue-on-error: true # provisional feature-branch diagnosis only
         run: python -m unittest -v test_assistant.py test_planner.py
