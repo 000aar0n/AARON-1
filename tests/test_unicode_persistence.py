@@ -189,10 +189,12 @@ class UnicodePersistenceTest(unittest.TestCase):
         theme = (root / "ui_theme.py").read_text(encoding="utf-8")
         calendar = (root / "planner_ui.py").read_text(encoding="utf-8")
         app = (root / "app.py").read_text(encoding="utf-8")
+        from unicode_support import FONT_STACK
         for font in ("Noto Sans Symbols 2", "Noto Color Emoji",
                      "PingFang SC", "Microsoft YaHei"):
-            self.assertIn(font, theme)
-        self.assertIn("Noto Color Emoji", calendar)
+            self.assertIn(font, FONT_STACK)
+        self.assertIn("from unicode_support import FONT_IMPORT, FONT_STACK", theme)
+        self.assertIn("from unicode_support import FONT_IMPORT, FONT_STACK", calendar)
         self.assertIn('st.form_submit_button("Send"', app)
 
 
