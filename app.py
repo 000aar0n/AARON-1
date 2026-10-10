@@ -15,7 +15,6 @@ from gmail_access import (
     check_account, client_ready, connected, disconnect, finish_auth,
     list_messages, make_auth_url, store_client_upload,
 )
-from avatar import render_face
 from ui_theme import install_theme, header, page_heading
 from planner_ui import calendar_page, tasks_page
 from planner import ensure_schema
@@ -28,7 +27,7 @@ from trained_chat import inference_dependencies_ready
 
 APP_BUILD = "2026.10.10-minimal-workspace"
 
-st.set_page_config(page_title="AARON-1", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="AARON-1", page_icon="A", layout="wide")
 
 
 def init_chat():
@@ -88,14 +87,14 @@ def render_calendar():
 
 def render_connections():
     page_heading(
-        "Your integrations",
+        "SETTINGS",
         "Connections",
         "Link Gmail with read-only permission or import your school assignments. "
         "You control what AARON-1 can access.",
     )
 
     with st.container(border=True):
-        st.markdown("#### ✉️ Gmail")
+        st.markdown("### Gmail")
         st.caption("Personal Gmail is fine. Google grants read-only mail access; "
                    "this app requests only headers and short snippets.")
         if connected():
@@ -175,7 +174,7 @@ def render_connections():
                     st.error("Could not start Google authentication. Check OAuth settings.")
 
     with st.container(border=True):
-        st.markdown("#### 📅 Google Calendar — private import")
+        st.markdown("### Calendar import")
         st.caption(
             "Import your Google Calendar export directly, including the ZIP "
             "download. Event times, durations, multi-day entries and recurring "
@@ -237,7 +236,7 @@ def render_connections():
                 st.error(f"Google Calendar import failed: {exc}")
 
     with st.container(border=True):
-        st.markdown("#### 📚 School assignments")
+        st.markdown("### School assignments")
         st.caption("For Blackbaud, export an assignment calendar (ICS) or CSV "
                    "if your school makes one available. This does not sign in to Blackbaud.")
         uploaded = st.file_uploader("Import school assignment file",
