@@ -112,12 +112,18 @@ def _render_editor():
                     st.session_state.get("planner_new_clock", time(16, 0)))
     chosen_priority = int(existing.get("priority_level") or 2) if existing else 2
 
+    # Controls which change the form's layout must be outside st.form;
+    # otherwise Streamlit won't update duration/estimate fields until saving.
+    category = st.segmented_control(
+        "Type", ["Task", "Event"],
+        default="Event" if kind_default == "event" else "Task",
+        key=f"{prefix}_type",
+    )
+    default_all_day = not bool(existing.get("due_time")) if existing else False
+    all_day = st.checkbox(
+        "All-day / no exact time", value=default_all_day, key=f"{prefix}_allday"
+    )
     with st.form(f"{prefix}_form", clear_on_submit=False):
-        category = st.segmented_control(
-            "Type", ["Task", "Event"],
-            default="Event" if kind_default == "event" else "Task",
-            key=f"{prefix}_type",
-        )
         title = st.text_input(
             "Title", value=(existing["title"] if existing else ""),
             placeholder="Chemistry lab, soccer practice, finish essay…",
@@ -127,10 +133,6 @@ def _render_editor():
             "Description / notes", value=(existing.get("notes") or "") if existing else "",
             placeholder="Instructions, links, things to remember…", height=95,
             key=f"{prefix}_description",
-        )
-        default_all_day = not bool(existing.get("due_time")) if existing else False
-        all_day = st.checkbox(
-            "All-day / no exact time", value=default_all_day, key=f"{prefix}_allday"
         )
         date_col, clock_col = st.columns(2)
         with date_col:
