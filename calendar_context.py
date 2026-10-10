@@ -82,7 +82,7 @@ def format_schedule(entries, label, *, max_events=35):
     if len(entries) > max_events:
         lines.append(
             f"…plus {len(entries) - max_events} more saved items. "
-            "Use Planner → Readable Week to see the rest."
+            "Use Planner → Week or Agenda to see more; click any item for full details."
         )
     return "\n".join(lines)
 
