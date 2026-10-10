@@ -78,6 +78,17 @@ CALENDAR_CSS = """
 .fc .fc-timegrid-event .fc-event-title{max-height:none!important}
 .fc .fc-daygrid-more-link{font-size:13px!important;
   padding:4px!important;color:#d8d2ff!important}
+/* Click feedback for mouse, keyboard and persisted selection. */
+.fc .fc-event:hover{outline:2px solid #b9b4ff!important;
+  outline-offset:1px!important;filter:brightness(1.14)!important;
+  box-shadow:0 3px 14px #12122290!important;z-index:9!important}
+.fc .fc-event:focus,.fc .fc-event:focus-visible{
+  outline:3px solid #f9efb3!important;outline-offset:1px!important;
+  box-shadow:0 0 0 4px #7566de5c!important;z-index:10!important}
+.fc .fc-event.aaron-event-selected{
+  outline:3px solid #f9edac!important;outline-offset:1px!important;
+  box-shadow:0 0 0 5px #7870d46e,0 5px 22px #06080caa!important;
+  filter:brightness(1.2)!important;z-index:11!important}
 .fc .fc-col-header-cell-cushion{font-size:12px!important}
 .fc .fc-timegrid-axis,.fc .fc-timegrid-slot-label{min-width:58px}
 @media(max-width:850px){.fc .fc-toolbar-title{font-size:1.04rem}
@@ -401,13 +412,17 @@ def _action_list(limit=5, *, scope):
 def _dismiss_calendar_popup():
     """Called when the modal is dismissed, saved, or explicitly closed."""
     st.session_state["planner_popup_open"] = False
+    # Keep selected event highlighted after the dialog closes so it's obvious
+    # which calendar item was just inspected/edited.
 
 
 def _open_calendar_popup(*, item_id=None, day=None, at_time=None, kind="task"):
     """Set the selected record; only the calendar tab shows a modal."""
     if item_id is not None:
+        st.session_state["planner_highlight_id"] = str(item_id)
         _choose_item(item_id)
     else:
+        st.session_state.pop("planner_highlight_id", None)
         _new_item(day=day, at_time=at_time, kind=kind)
     st.session_state["planner_popup_open"] = True
 
@@ -484,6 +499,11 @@ def calendar_page():
         items_for_calendar(start=range_start, end=range_end),
         start=range_start, end=range_end,
     )
+    selected_event_id = st.session_state.get("planner_highlight_id")
+    if selected_event_id:
+        for calendar_event in all_events:
+            if calendar_event["id"] == selected_event_id:
+                calendar_event["classNames"] = ["aaron-event-selected"]
     options = {
         "initialView": "timeGridWeek",
         "headerToolbar": {
@@ -547,6 +567,7 @@ def calendar_page():
                 if st.session_state.get("planner_last_click") != signature:
                     st.session_state["planner_last_click"] = signature
                     _open_calendar_popup(item_id=item_id)
+                    st.rerun()  # Rerender to show the selected event outline.
         elif callback in ("dateClick", "select"):
             details = result.get(callback) or {}
             raw = details.get("date") or details.get("start")
