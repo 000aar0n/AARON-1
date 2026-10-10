@@ -117,7 +117,7 @@ def _local_model_reply(message, previous, model):
         "reply. Actual actions must go through the planner controls or supported "
         "verified chat commands. Never invent assignments, emails, due dates, "
         "connections, or tool results. Be transparent that you are a local model "
-        "running within AARON-1, not an independently trained general AI. "
+        "running locally in AARON-1, based on an existing language model. "
         "Respect boundaries and privacy. Current local datetime: "
         f"{datetime.now().isoformat(timespec='minutes')}. "
         "User-taught memories:\n" + (memory_context or "None") + "\n" +
@@ -132,6 +132,14 @@ def _local_model_reply(message, previous, model):
         "model": model, "messages": context,
         "stream": False, "options": {"temperature": .55, "num_predict": 420},
     }).encode("utf-8")
+    if model == "__aaron_trained__":
+        try:
+            from trained_chat import generate
+            return generate(context)
+        except (ImportError, OSError, RuntimeError, ValueError) as exc:
+            return ("I couldn't load my trained conversational model. "
+                    "Your tasks and memories are safe. Check Train AARON-1 "
+                    f"and the optional dependencies ({type(exc).__name__}: {exc}).")
     request = Request(OLLAMA_BASE + "/api/chat", data=payload,
                       headers={"Content-Type": "application/json"}, method="POST")
     try:
