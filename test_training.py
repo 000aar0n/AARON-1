@@ -106,6 +106,7 @@ class TrainingDataTests(unittest.TestCase):
         folder = data.MODEL_HOME / job["id"] / "adapter"
         folder.mkdir(parents=True)
         (folder / "adapter_config.json").write_text('{"peft_type":"LORA"}')
+        (folder / "adapter_model.safetensors").write_bytes(b"mock safetensors file")
         data.update_job(job["id"], status="completed")
         data.activate_trained(job["id"])
         self.assertEqual(data.trained_model()["job_id"], job["id"])
