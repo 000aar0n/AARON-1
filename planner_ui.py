@@ -182,6 +182,7 @@ def _render_editor(*, scope):
         submitted = st.form_submit_button(
             "Save changes" if existing else "Create",
             type="primary", use_container_width=True,
+            key=f"{prefix}_save",
         )
     if submitted:
         details = dict(
