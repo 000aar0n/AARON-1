@@ -4,3 +4,9 @@ __pycache__/
 .venv*/
 venv*/
 .DS_Store
+
+# Calendar exports are personal and must never be pushed to public GitHub
+*.ics
+*.ical
+*.ical.zip
+*.ics.zip
