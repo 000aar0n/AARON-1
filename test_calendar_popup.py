@@ -48,7 +48,7 @@ class FullWidthCalendarTests(unittest.TestCase):
 
     def test_normal_page_uses_full_width_without_permanent_calendar_editor(self):
         from app import APP_BUILD
-        self.assertIn("grounded-calendar-v9", APP_BUILD)
+        self.assertIn("aligned-calendar-v10", APP_BUILD)
         from planner_ui import CALENDAR_CSS
         self.assertIn("min-height:125px", CALENDAR_CSS)
         self.assertIn("font-size:13px", CALENDAR_CSS)
