@@ -11,7 +11,7 @@ from assistant_core import learn_priority
 from planner import (
     PRIORITY_NAMES, calendar_events, create_item, daily_items, delete_item,
     get_item, items_for_calendar, next_actions, open_tasks, toggle_complete,
-    update_item,
+    update_item, set_priority,
 )
 
 CALENDAR_CSS = """
@@ -237,12 +237,16 @@ def _action_list(limit=5):
             grade.caption(f"#{rank}")
             st.caption(f"{_format_deadline(task)} · {PRIORITY_NAMES[int(task.get('priority_level') or 2)]}")
             st.caption("Why: " + task["why"])
-            c1, c2 = st.columns(2)
+            c1, c2, c3 = st.columns([1, 1.4, 1], gap="small")
             if c1.button("✓ Done", key=f"rec_done_{task['id']}",
                          use_container_width=True):
                 toggle_complete(task["id"], True)
                 st.rerun()
-            if c2.button("Edit", key=f"rec_edit_{task['id']}",
+            if c2.button("↑ Important", key=f"rec_raise_{task['id']}",
+                         use_container_width=True):
+                set_priority(task["id"], min(4, int(task.get("priority_level") or 2) + 1))
+                st.rerun()
+            if c3.button("Edit", key=f"rec_edit_{task['id']}",
                          use_container_width=True):
                 _choose_item(task["id"])
                 st.rerun()
