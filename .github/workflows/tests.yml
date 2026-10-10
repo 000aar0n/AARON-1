@@ -1,7 +1,7 @@
 name: Verify AARON-1
 on:
   push:
-    branches: [main, master, 'feature/no-ollama-required']
+    branches: [main, master]
   workflow_dispatch:
 
 permissions:
