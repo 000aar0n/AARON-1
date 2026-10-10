@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import calendar
 import html
+from datetime import timedelta
 from collections import defaultdict
 from datetime import date
 
@@ -21,6 +22,7 @@ from gmail_access import (
     list_messages, make_auth_url, store_client_upload,
 )
 from avatar import render_face
+from ui_theme import install_theme, header, page_heading, metric
 
 st.set_page_config(page_title="AARON-1", page_icon="🤖", layout="wide")
 
@@ -123,7 +125,7 @@ def render_tasks():
 
 
 def render_calendar():
-    """Monthly clickable calendar powered by the SAME task database as Tasks."""
+    """Interactive monthly view with a focused day panel and real task actions."""
     today = date.today()
     if "calendar_month" not in st.session_state:
         st.session_state["calendar_month"] = today.replace(day=1).isoformat()
@@ -136,131 +138,235 @@ def render_calendar():
         selected = month
         st.session_state["calendar_selected"] = selected.isoformat()
 
-    st.subheader("📅 Assignment calendar")
-    st.caption("Everything due on each date, including assignments imported from "
-               "Blackbaud files and tasks you add yourself.")
-
-    left, heading, home, right = st.columns([1.2, 4.5, 1, 1.2])
-    with left:
-        if st.button("← Previous", key="cal_prev", use_container_width=True):
-            target = change_month(month, -1)
-            st.session_state["calendar_month"] = target.isoformat()
-            st.session_state["calendar_selected"] = target.isoformat()
-            st.rerun()
-    with heading:
-        st.markdown(f"### {month.strftime('%B %Y')}")
-    with home:
-        if st.button("Today", key="cal_today", use_container_width=True):
-            st.session_state["calendar_month"] = today.replace(day=1).isoformat()
-            st.session_state["calendar_selected"] = today.isoformat()
-            st.rerun()
-    with right:
-        if st.button("Next →", key="cal_next", use_container_width=True):
-            target = change_month(month, 1)
-            st.session_state["calendar_month"] = target.isoformat()
-            st.session_state["calendar_selected"] = target.isoformat()
-            st.rerun()
+    page_heading(
+        "Plan your week",
+        "Your calendar",
+        "A clear view of what's due, what's finished, and what needs your attention.",
+    )
 
     month_tasks = tasks_due_in_month(month.year, month.month)
     by_day = defaultdict(list)
     for task in month_tasks:
         by_day[task["due"]].append(task)
-    due_count = sum(not item["completed"] for item in month_tasks)
-    finished_count = len(month_tasks) - due_count
-    st.caption(f"{due_count} to do this month  ·  {finished_count} completed"
-               "  ·  Click a day to see assignments")
+    remaining = [task for task in month_tasks if not task["completed"]]
+    today_count = len([task for task in remaining if task["due"] == today.isoformat()])
+    completed_count = len(month_tasks) - len(remaining)
 
-    weekdays = st.columns(7, gap="small")
-    for col, weekday in zip(weekdays, ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")):
-        with col:
-            st.markdown(f"**{weekday}**")
+    a, b, c = st.columns(3, gap="medium")
+    with a:
+        metric("Assignments due", len(remaining), "In " + month.strftime("%B"))
+    with b:
+        metric("Due today", today_count, today.strftime("%a, %b %d"))
+    with c:
+        metric("Finished", completed_count, "Completed this month")
 
-    for week in calendar.Calendar(firstweekday=0).monthdatescalendar(month.year, month.month):
-        columns = st.columns(7, gap="small")
-        for column, day in zip(columns, week):
-            with column:
-                with st.container(border=True, height=154):
-                    if day.month != month.month:
-                        st.caption(f"{day.day}")
-                        continue
-                    day_items = by_day.get(day.isoformat(), [])
-                    open_items = [t for t in day_items if not t["completed"]]
-                    label = str(day.day) + (" · TODAY" if day == today else "")
-                    if st.button(label, key=f"cal_day_{day.isoformat()}",
-                                 type="primary" if day == selected else "secondary",
-                                 use_container_width=True,
-                                 help=f"{len(open_items)} unfinished assignment(s)"):
-                        st.session_state["calendar_selected"] = day.isoformat()
-                        st.rerun()
-                    if open_items:
-                        for item in open_items[:2]:
-                            title = item["title"]
-                            st.caption("• " + (title if len(title) <= 23 else title[:20] + "…"))
-                        if len(open_items) > 2:
-                            st.caption(f"+{len(open_items) - 2} more")
-                    elif day_items:
-                        st.caption("✓ All done")
-                    else:
-                        st.caption("—")
-
-    st.divider()
-    st.markdown(f"### {selected.strftime('%A, %B')} {selected.day}, {selected.year}")
-    items = by_day.get(selected.isoformat(), [])
-    pending = [t for t in items if not t["completed"]]
-    completed = [t for t in items if t["completed"]]
-
-    if not items:
-        st.info("Nothing due this day. Add something below or choose another date.")
-
-    for task in pending:
-        with st.container(border=True):
-            title_col, done_col, priority_col = st.columns([5, 1.3, 1.7])
-            with title_col:
-                st.write(f"**{task['title']}**")
-                if task.get("source") != "manual":
-                    st.caption(f"Imported from {task['source'].capitalize()}")
-            with done_col:
-                if st.button("✓ Done", key=f"cal_done_{task['id']}",
-                             use_container_width=True):
-                    update_task(task["id"], completed=True)
-                    st.rerun()
-            with priority_col:
-                if st.button("↑ Important", key=f"cal_priority_{task['id']}",
-                             use_container_width=True):
-                    learn_priority(task["id"], True)
-                    st.rerun()
-
-    if completed:
-        with st.expander(f"✓ Completed ({len(completed)})"):
-            for task in completed:
-                task_col, reopen_col = st.columns([5, 1])
-                task_col.write(task["title"])
-                if reopen_col.button("Reopen", key=f"cal_reopen_{task['id']}"):
-                    update_task(task["id"], completed=False)
-                    st.rerun()
-
-    st.markdown("**Add an assignment to this day**")
-    with st.form("calendar_new_task", clear_on_submit=True):
-        title = st.text_input("Assignment", placeholder="Geometry homework, chemistry quiz...")
-        if st.form_submit_button(f"Add to {selected.strftime('%b')} {selected.day}"):
-            try:
-                add_task(title, due=selected.isoformat())
+    grid_column, detail_column = st.columns([7.3, 3.7], gap="large")
+    with grid_column:
+        nav_prev, nav_title, nav_today, nav_next = st.columns(
+            [0.8, 4.6, 1.25, 0.8], gap="small", vertical_alignment="center"
+        )
+        with nav_prev:
+            if st.button("‹", key="cal_prev", help="Previous month",
+                         use_container_width=True):
+                target = change_month(month, -1)
+                st.session_state["calendar_month"] = target.isoformat()
+                st.session_state["calendar_selected"] = target.isoformat()
                 st.rerun()
-            except ValueError as exc:
-                st.error(str(exc))
+        with nav_title:
+            st.markdown(
+                '<div class="cal-month">' +
+                html.escape(month.strftime("%B %Y")) + "</div>",
+                unsafe_allow_html=True,
+            )
+        with nav_today:
+            if st.button("Today", key="cal_today", use_container_width=True):
+                st.session_state["calendar_month"] = today.replace(day=1).isoformat()
+                st.session_state["calendar_selected"] = today.isoformat()
+                st.rerun()
+        with nav_next:
+            if st.button("›", key="cal_next", help="Next month",
+                         use_container_width=True):
+                target = change_month(month, 1)
+                st.session_state["calendar_month"] = target.isoformat()
+                st.session_state["calendar_selected"] = target.isoformat()
+                st.rerun()
 
-    no_date = tasks_without_due_date()
-    if no_date:
-        with st.expander(f"Unscheduled assignments ({len(no_date)})"):
-            st.caption("These tasks don't have a due date yet. Choose a day above "
-                       "and click Schedule to put them on the calendar.")
-            for task in no_date:
-                name_col, schedule_col = st.columns([5, 1.6])
-                name_col.write(task["title"])
-                if schedule_col.button("Schedule", key=f"cal_schedule_{task['id']}",
-                                       use_container_width=True):
-                    set_task_due_date(task["id"], selected.isoformat())
-                    st.rerun()
+        weekdays = st.columns(7, gap="small")
+        for column, name in zip(weekdays, ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")):
+            with column:
+                st.markdown('<div class="cal-weekday">' + name + "</div>",
+                            unsafe_allow_html=True)
+
+        for week in calendar.Calendar(firstweekday=0).monthdatescalendar(
+            month.year, month.month
+        ):
+            columns = st.columns(7, gap="small")
+            for column, day in zip(columns, week):
+                with column:
+                    style = ("outside" if day.month != month.month else
+                             "selected" if day == selected else
+                             "today" if day == today else "normal")
+                    with st.container(
+                        border=False, height=124,
+                        key=f"cal-cell-{style}-{day.isoformat()}",
+                    ):
+                        if day.month != month.month:
+                            st.markdown(
+                                f'<div class="cal-outside-date">{day.day}</div>',
+                                unsafe_allow_html=True,
+                            )
+                            continue
+
+                        day_items = by_day.get(day.isoformat(), [])
+                        unfinished = [item for item in day_items if not item["completed"]]
+                        if st.button(
+                            str(day.day), key=f"cal_day_{day.isoformat()}",
+                            use_container_width=False,
+                            help=(f"Select {day.strftime('%B %d')}: "
+                                  f"{len(unfinished)} remaining"),
+                        ):
+                            st.session_state["calendar_selected"] = day.isoformat()
+                            st.rerun()
+                        if day == today:
+                            st.markdown(
+                                '<span class="cal-today-flag">TODAY</span>',
+                                unsafe_allow_html=True,
+                            )
+                        if unfinished:
+                            chips = []
+                            for item in unfinished[:2]:
+                                subject_class = (
+                                    " school" if item.get("source") in ("blackbaud", "calendar")
+                                    else ""
+                                )
+                                chips.append(
+                                    '<div class="cal-event' + subject_class + '" title="' +
+                                    html.escape(item["title"], quote=True) + '">' +
+                                    html.escape(item["title"]) + "</div>"
+                                )
+                            if len(unfinished) > 2:
+                                chips.append(
+                                    '<div class="cal-more">+' +
+                                    str(len(unfinished) - 2) + " more</div>"
+                                )
+                            chips.append(
+                                '<div class="cal-count">' +
+                                str(len(unfinished)) + ' due</div>'
+                            )
+                            st.markdown(
+                                '<div class="cal-events">' + "".join(chips) + "</div>",
+                                unsafe_allow_html=True,
+                            )
+                        elif day_items:
+                            st.markdown('<div class="cal-finished">✓ All done</div>',
+                                        unsafe_allow_html=True)
+                        else:
+                            st.markdown('<div class="cal-quiet">—</div>',
+                                        unsafe_allow_html=True)
+
+        st.markdown(
+            '<div class="muted-line" style="margin-top:12px">'
+            '<span style="color:#a79cff">●</span> Personal tasks &nbsp;&nbsp;'
+            '<span style="color:#76d6c1">●</span> Imported assignments'
+            '</div>', unsafe_allow_html=True,
+        )
+
+    with detail_column:
+        with st.container(border=True, key="calendar-day-detail"):
+            st.markdown('<div class="eyebrow">SELECTED DAY</div>',
+                        unsafe_allow_html=True)
+            st.markdown(
+                '<div class="cal-detail-title">' +
+                html.escape(selected.strftime("%A, %B ")) + str(selected.day) +
+                '</div><div class="cal-detail-sub">' +
+                str(selected.year) + " · " +
+                str(len([t for t in by_day.get(selected.isoformat(), [])
+                         if not t["completed"]])) +
+                ' open assignment(s)</div>',
+                unsafe_allow_html=True,
+            )
+            day_tasks = by_day.get(selected.isoformat(), [])
+            pending = [task for task in day_tasks if not task["completed"]]
+            completed = [task for task in day_tasks if task["completed"]]
+
+            if not pending:
+                st.markdown(
+                    '<div class="cal-no-tasks">All clear for this day. '
+                    'Enjoy the breathing room or add something below.</div>',
+                    unsafe_allow_html=True,
+                )
+
+            for item in pending:
+                with st.container(border=True, key=f"cal-task-{item['id']}"):
+                    st.markdown(
+                        '<div class="cal-task-title">' +
+                        html.escape(item["title"]) + "</div>",
+                        unsafe_allow_html=True,
+                    )
+                    source = ("School import" if item.get("source") in ("blackbaud", "calendar")
+                              else "Gmail" if item.get("source") == "email"
+                              else "Personal task")
+                    st.markdown(
+                        '<div class="cal-task-meta">' +
+                        html.escape(source) + "</div>",
+                        unsafe_allow_html=True,
+                    )
+                    done_col, important_col = st.columns(2, gap="small")
+                    if done_col.button(
+                        "✓ Done", key=f"cal_done_{item['id']}",
+                        use_container_width=True,
+                    ):
+                        update_task(item["id"], completed=True)
+                        st.rerun()
+                    if important_col.button(
+                        "↑ Important", key=f"cal_priority_{item['id']}",
+                        use_container_width=True,
+                    ):
+                        learn_priority(item["id"], True)
+                        st.rerun()
+
+            if completed:
+                with st.expander(f"Completed ({len(completed)})"):
+                    for item in completed:
+                        name_col, reopen_col = st.columns([4, 1.6])
+                        name_col.caption(item["title"])
+                        if reopen_col.button(
+                            "Reopen", key=f"cal_reopen_{item['id']}",
+                        ):
+                            update_task(item["id"], completed=False)
+                            st.rerun()
+
+            st.divider()
+            st.markdown("**Add an assignment**")
+            with st.form("calendar_new_task", clear_on_submit=True):
+                title = st.text_input(
+                    "Task name", placeholder="e.g. Finish chemistry problems",
+                    label_visibility="collapsed",
+                )
+                if st.form_submit_button(
+                    "+ Add to " + selected.strftime("%b ") + str(selected.day),
+                    type="primary", use_container_width=True,
+                ):
+                    try:
+                        add_task(title, due=selected.isoformat())
+                        st.rerun()
+                    except ValueError as exc:
+                        st.error(str(exc))
+
+        no_date = tasks_without_due_date()
+        if no_date:
+            with st.expander(f"Unscheduled tasks ({len(no_date)})"):
+                st.caption("Choose a date on the calendar, then schedule the task.")
+                for item in no_date:
+                    title_col, schedule_col = st.columns([3.2, 1.1])
+                    title_col.caption(item["title"])
+                    if schedule_col.button(
+                        "Set date", key=f"cal_schedule_{item['id']}",
+                        use_container_width=True,
+                    ):
+                        set_task_due_date(item["id"], selected.isoformat())
+                        st.rerun()
+
 
 def render_connections():
     st.subheader("Connect your accounts")
