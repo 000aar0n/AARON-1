@@ -7,3 +7,6 @@ streamlit-calendar>=1.4.0,<2
 python-dateutil>=2.9,<3
 # IANA timezone data required on Windows for imported Google Calendar TZIDs.
 tzdata>=2025.2
+
+# SQLite-compatible remote datastore (required only when Turso secrets are set).
+turso-serverless==0.1.0
