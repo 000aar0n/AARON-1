@@ -104,6 +104,33 @@ class VerifiedCalendarTests(unittest.TestCase):
         self.assertFalse(action)
         self.assertNotIn("Advanced Architecture", classes)
 
+    def test_teacher_room_and_general_class_questions_never_hallucinate(self):
+        self.import_fixture()
+        for question in (
+            "Who is my teacher for Advanced Architecture?",
+            "What is my classroom?",
+            "Which classes do I have on Friday?",
+            "Show me my full class timetable",
+        ):
+            reply, modified = conv.respond(
+                question, now=datetime(2026, 10, 10), model="not-installed",
+            )
+            self.assertFalse(modified)
+            self.assertNotIn(
+                "Teacher: Atlas", reply,
+                "The assistant disclosed an unverified teacher for: " + question,
+            )
+            self.assertNotIn(
+                "Advanced Architecture", reply,
+                "The assistant attributed another student's course for: " + question,
+            )
+            self.assertTrue(
+                any(term in reply.lower() for term in (
+                    "verify", "verified", "unverified", "confirm"
+                )),
+                repr(reply),
+            )
+
     def test_local_model_context_never_receives_unverified_classes(self):
         self.import_fixture()
         ctx = cc.calendar_model_context(
