@@ -1,4 +1,5 @@
 """Planner v2: migration, timed entries, recommendations and conversational commands."""
+import json
 import tempfile
 import unittest
 from datetime import date, datetime
@@ -153,6 +154,51 @@ class PlannerTests(unittest.TestCase):
         conversation.respond("my favorite subject is chemistry")
         value, _ = conversation.respond("what's my favorite subject")
         self.assertIn("chemistry", value)
+
+    def test_local_model_receives_recent_chat_and_saved_facts(self):
+        core.remember("favorite food", "sushi")
+        captured = {}
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self, *_args):
+                return b'{"message":{"content":"Yep, sushi is your favorite."}}'
+
+        def fake_open(request, timeout=0):
+            captured["url"] = request.full_url
+            captured["payload"] = json.loads(request.data.decode("utf-8"))
+            return FakeResponse()
+
+        # urlopen is the only networking method; it is patched during tests.
+        with patch.object(conversation, "urlopen", side_effect=fake_open):
+            reply, acted = conversation.respond(
+                "what food do i like?",
+                previous=[{"role": "user", "message": "Do you remember me?"}],
+                model="qwen2.5:3b",
+            )
+        self.assertFalse(acted)
+        self.assertIn("sushi", reply)
+        self.assertEqual(captured["url"],
+                         "http://127.0.0.1:11434/api/chat")
+        self.assertIn("favorite food: sushi",
+                      captured["payload"]["messages"][0]["content"])
+        self.assertTrue(any("Do you remember me?" in entry["content"]
+                            for entry in captured["payload"]["messages"]))
+
+    def test_natural_language_calendar_questions(self):
+        planner.create_item(title="Chinese quiz", due="2026-10-12", due_time="11:15")
+        text, action = conversation.respond(
+            "what do i have monday", now=datetime(2026, 10, 9, 18))
+        self.assertFalse(action)
+        self.assertIn("Chinese quiz", text)
+        all_due, action = conversation.respond(
+            "what homework is due", now=datetime(2026, 10, 9, 18))
+        self.assertIn("Chinese quiz", all_due)
 
     def test_local_chat_does_not_require_external_credentials(self):
         answer, action = conversation.respond("how are you")
