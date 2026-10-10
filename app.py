@@ -106,9 +106,9 @@ def render_connections():
                 "Download a backup before restarting the app."
             )
         st.caption(
-            "Private database setup: configure TURSO_DATABASE_URL, "
-            "and TURSO_AUTH_TOKEN in Streamlit Cloud Secrets. "
-            "Do not paste credentials into GitHub."
+            "Database setup: configure TURSO_DATABASE_URL and "
+            "TURSO_AUTH_TOKEN in Streamlit Cloud Secrets. "
+            "Keep the Streamlit app private and never commit credentials to GitHub."
         )
         try:
             backup = export_personal_data()
