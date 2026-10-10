@@ -56,6 +56,31 @@ The Turso token protects the database connection, **not the public website**.
 AARON-1's export does not include Gmail OAuth files, downloaded model weights
 or local training jobs; those require separate storage and backups.
 
+### Troubleshooting Turso after changing Streamlit Secrets
+
+If AARON-1 cannot open the database, it now shows a **safe recovery
+screen** instead of crashing or silently switching to temporary local storage.
+The database URL and token are never shown.
+
+Turso offers **two** database engines: the new Turso engine and older libSQL.
+AARON-1 now supports both. It selects `libsql` automatically for a
+`libsql://...` URL, and the new Turso engine otherwise. If your database
+uses the other engine, you can add one optional value under Streamlit Secrets:
+
+```toml
+TURSO_DATABASE_ENGINE = "libsql"
+```
+
+Or use `"turso"` for the new engine. Keep your existing
+`TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` secrets.
+**Never paste a token or personal calendar into an issue or GitHub.**
+
+If you see a 401/403 or unauthorized error, the token is likely invalid,
+expired or for the wrong database. A 404 often means the database URL or
+engine doesn't match. Errors can also be caused by a network outage.
+Use Streamlit Cloud's **Manage app → Logs** to inspect the full error
+privately; never share credentials from logs.
+
 ### Unicode and special characters
 
 Titles, notes, event names and chat history use UTF-8 and are never converted
