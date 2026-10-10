@@ -103,6 +103,10 @@ def _is_personal_calendar_query(text):
     """
     if re.match(r"^(?:add|create|schedule)\s+(?:task|event)\s+", text):
         return False
+    # Personal memory statements such as "my favorite subject is chemistry"
+    # or "what's my favorite class?" are not timetable requests.
+    if re.search(r"\b(?:favorite|favourite|least favorite|preferred)\b", text):
+        return False
 
     personal = bool(re.search(r"\b(?:my|mine|i|me|we|our)\b", text))
     question = text.startswith((
@@ -118,7 +122,7 @@ def _is_personal_calendar_query(text):
         r"teachers?|instructors?|homerooms?|who teaches)\b", text
     ))
     classes = bool(re.search(
-        r"\b(?:classes|class|courses?|lessons?|subjects?|periods?)\b", text
+        r"\b(?:classes|class|courses?|lessons?|periods?)\b", text
     ))
     if timetable and (personal or question or temporal):
         return True
