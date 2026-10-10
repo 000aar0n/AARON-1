@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from assistant_core import remember, recall
+from assistant_core import remember, recall, connect
 from planner import create_item, daily_items, next_actions, open_tasks, PRIORITY_NAMES
 
 OLLAMA_BASE = "http://127.0.0.1:11434"
@@ -101,6 +101,14 @@ def _local_model_reply(message, previous, model):
         f"| note: {str(t.get('notes') or '')[:180]}"
         for t in actions
     ]
+    with connect() as db:
+        known_facts = [
+            f"{row['name']}: {row['value']}"
+            for row in db.execute(
+                "SELECT name,value FROM memories ORDER BY name LIMIT 35"
+            ).fetchall()
+        ]
+    memory_context = "\n".join(known_facts)[:3000]
     system = (
         "You are the conversational voice for AARON-1, a user's locally running "
         "planner and assistant. Speak like an easygoing, curious friend, concise "
@@ -112,6 +120,7 @@ def _local_model_reply(message, previous, model):
         "running within AARON-1, not an independently trained general AI. "
         "Respect boundaries and privacy. Current local datetime: "
         f"{datetime.now().isoformat(timespec='minutes')}. "
+        "User-taught memories:\n" + (memory_context or "None") + "\n" +
         "Known outstanding priorities:\n" + "\n".join(tasks or ["None"])
     )
     context = [{"role": "system", "content": system}]
