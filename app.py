@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import html
+from datetime import date, timedelta
 
 import streamlit as st
 
@@ -186,8 +187,7 @@ def render_connections():
             type=["ics", "zip"], key="google_calendar_file",
         )
         range_from = st.date_input(
-            "Import events beginning", value=__import__("datetime").date.today()
-            - __import__("datetime").timedelta(days=30),
+            "Import events beginning", value=date.today() - timedelta(days=30),
             key="google_calendar_from",
             help="The export contains years of history. Usually the last 30 "
                  "days onward is enough; choose an earlier date if needed.",
