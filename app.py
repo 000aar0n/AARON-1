@@ -441,9 +441,12 @@ def render_calendar():
 
 
 def render_connections():
-    st.subheader("Connect your accounts")
-    st.caption("Nothing is connected until you authorize it. "
-               "No password sharing, no sending mail, no deleting mail.")
+    page_heading(
+        "Your integrations",
+        "Connections",
+        "Link Gmail with read-only permission or import your school assignments. "
+        "You control what AARON-1 can access.",
+    )
 
     with st.container(border=True):
         st.markdown("#### ✉️ Gmail")
@@ -553,35 +556,48 @@ def render_connections():
 
 
 def render_chat():
-    st.subheader("Ask AARON-1")
-    with st.expander("🤖 Show robot", expanded=False):
-        history = messages(1)
-        last = history[-1]["message"] if history and history[-1]["role"] == "assistant" else "Hi. What can I help with?"
-        render_face(last, key="home")
-    st.caption("One assistant, not a network. It remembers tasks and learns "
-               "your priorities. Natural-language skills are still limited.")
-    for item in messages():
+    page_heading(
+        "Your assistant",
+        "Ask AARON-1",
+        "Manage assignments, check a connected Gmail inbox, and teach "
+        "AARON-1 what matters to you.",
+    )
+    previous = messages()
+    if not previous:
+        st.info(
+            "Try asking: **what homework is due**, **add task read chapter 3**, "
+            "or **check my email**."
+        )
+    for item in previous:
         with st.chat_message(item["role"]):
             st.markdown(item["message"])
-    prompt = st.chat_input("Ask about homework, email, or add a task...")
+    prompt = st.chat_input("Message AARON-1…")
     if prompt:
         write_chat("user", prompt)
         reply = answer(prompt)
         write_chat("assistant", reply)
         st.rerun()
-    if not messages():
-        st.write("Try **what homework is due**, **add task read chapter 3**, "
-                 "or **check my email**.")
+
+    with st.expander("Meet AARON-1", expanded=False):
+        last = (previous[-1]["message"] if previous
+                and previous[-1]["role"] == "assistant"
+                else "Hi. What can I help with?")
+        render_face(last, key="home")
+        st.caption(
+            "AARON-1 uses small local models and rules. It doesn't have "
+            "general-purpose language understanding yet."
+        )
 
 
 def main():
     init_chat()
     from assistant_core import migrate_legacy_facts
     migrate_legacy_facts()
-    st.title("🤖 AARON-1")
-    st.caption("Your personal learning assistant · Local-first · No LLM")
 
-    # OAuth query params might arrive on any tab: process and clear them globally.
+    install_theme()
+    header()
+
+    # Google returns to this same local dashboard after the user approves OAuth.
     if "code" in st.query_params or "error" in st.query_params:
         try:
             finish_auth(st.query_params.to_dict())
@@ -591,21 +607,26 @@ def main():
             st.query_params.clear()
             st.error(f"Gmail connection failed: {exc}")
 
-    chat_tab, calendar_tab, task_tab, connection_tab = st.tabs(
-        ["💬 Chat", "📅 Calendar", "✅ Tasks", "🔗 Connect"]
+    calendar_tab, task_tab, chat_tab, connection_tab = st.tabs(
+        ["Calendar", "Assignments", "Chat", "Connections"]
     )
-    with chat_tab:
-        render_chat()
     with calendar_tab:
         render_calendar()
     with task_tab:
         render_tasks()
+    with chat_tab:
+        render_chat()
     with connection_tab:
         render_connections()
 
-    _, n = load_weights()
-    st.caption(f"🧠 AARON-1 has learned from {n} priority decisions. "
-               "Your files and saved memories stay on this Mac.")
+    _, feedback_count = load_weights()
+    st.markdown(
+        '<div class="muted-line" style="margin-top:32px;padding-top:18px;'
+        'border-top:1px solid #2a3242;">'
+        f'AARON-1 · {feedback_count} personal priority decisions learned · '
+        'Data saved locally</div>',
+        unsafe_allow_html=True,
+    )
 
 
 if __name__ == "__main__":
