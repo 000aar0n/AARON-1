@@ -81,7 +81,7 @@ class Store:
         action_id = uuid.uuid4().hex
         digest = hashlib.sha256(canonical(dict(kind=kind, payload=payload)).encode()).hexdigest()
         with self.db() as db:
-            db.execute("INSERT INTO actions VALUES(?,?,?,?,?,?,?,?,NULL)",
+            db.execute("INSERT INTO actions VALUES(?,?,?,?,?,?,?,NULL)",
                 (action_id, kind, self.encrypt(payload), digest, "pending", now, now+ttl))
         self.audit("proposed", action_id)
         return self.action(action_id)

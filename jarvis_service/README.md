@@ -86,7 +86,7 @@ The Blueprint path is `jarvis_service/render.yaml` and the branch is `jarvis/per
 Before deployment:
 1. Approve the actual hosting costs and provider usage budget.
 2. Supply private settings listed in [.env.example](.env.example). Generate OWNER_TOKEN with `python -c "import secrets; print(secrets.token_urlsafe(32))"` and TOKEN_ENCRYPTION_KEY with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` on your own trusted machine. Do not paste them into chat or commit them.
-3. Ensure the persistent volume is writable by UID 10001 (the container user). If the provider mounts a root-owned volume, initialize its ownership through the provider before starting; do not weaken file permissions.
+3. The container initializes ownership of its dedicated mounted data directory and drops root privileges to UID 10001 before starting the server. Verify this on the selected host; do not weaken file permissions.
 4. Set PUBLIC_URL to the final HTTPS origin. Turn off access logging so OAuth codes and callback parameters are not logged.
 5. Validate the Blueprint using the current Render CLI and the exact path. Then deploy only after cost approval.
 6. Verify /healthz, authenticated status, Google consent and read probes, scheduler heartbeat across restart, encrypted-state recovery, and approved live write/call tests.

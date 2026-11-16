@@ -306,7 +306,9 @@ def test_inbound_call_requires_one_use_grant(settings,store):
     params={"AccountSid":s.twilio_sid,"CallSid":"CA1","To":s.twilio_number,"From":"+12125550101"}
     assert "<Reject" in v.incoming(params)
     v.arm_receive(call_payload(),"approved-id",time.time()+100)
-    xml=v.incoming(params)
+    with patch.object(v, "client") as provider:
+        xml=v.incoming(params)
+        provider.return_value.calls("CA1").update.assert_called_once_with(time_limit=60)
     assert "<Connect>" in xml and "wss://jarvis.example/twilio/media" in xml
     assert "AI assistant" in xml
     assert v.incoming(params)==xml

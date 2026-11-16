@@ -4,6 +4,8 @@ import contextlib
 import json
 import secrets
 import time
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from urllib.parse import parse_qs, quote
 from twilio.request_validator import RequestValidator
 from twilio.rest import Client
@@ -27,7 +29,7 @@ def realtime_config(purpose):
         "type": "session.update",
         "session": {
             "type": "realtime", "output_modalities": ["audio"],
-            "instructions": VOICE_RULES+"\nReviewed purpose: "+purpose,
+            "instructions": VOICE_RULES+"\nCurrent owner time: "+datetime.now(ZoneInfo("America/New_York")).isoformat()+"\nReviewed purpose: "+purpose,
             "audio": {
                 "input": {"format": {"type": "audio/pcmu"},
                           "turn_detection": {"type": "server_vad", "create_response": True,
@@ -127,6 +129,13 @@ class Voice:
             # No auto-answer: even inbound conversation can incur charges.
             response.reject(reason="busy")
             self.store.audit("inbound_rejected_no_approval")
+            return str(response)
+        # Establish the provider-side hard duration cap before answering.
+        try:
+            self.client().calls(sid).update(time_limit=grant["payload"]["max_seconds"])
+        except Exception as exc:
+            self.store.audit("inbound_limit_failed", grant["action_id"], type(exc).__name__)
+            response.reject(reason="busy")
             return str(response)
         token = self.session(grant["payload"], grant["action_id"], sid)
         result = self.twiml(token)
