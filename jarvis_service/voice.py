@@ -70,9 +70,14 @@ class Voice:
     def validate(self, path, signature, params=None, websocket=False):
         if not self.s.twilio_token:
             return False
-        # Twilio signs the HTTPS upgrade URL for WebSocket handshakes.
-        return RequestValidator(self.s.twilio_token).validate(
-            self.s.public_url+path, params or {}, signature or "")
+        url = self.s.public_url+path
+        if websocket:
+            # Match the WSS URL configured in TwiML, not forwarded request headers.
+            url = url.replace("https://", "wss://", 1)
+        validator = RequestValidator(self.s.twilio_token)
+        candidates = [url, url+"/"] if websocket else [url]
+        return any(validator.validate(candidate, params or {}, signature or "")
+                   for candidate in candidates)
 
     def twiml(self, token):
         response = VoiceResponse()

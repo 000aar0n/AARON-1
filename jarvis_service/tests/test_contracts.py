@@ -291,7 +291,7 @@ def test_voice_signature_and_unsigned_websocket(settings,store):
     v=Voice(s,store)
     assert not v.validate("/twilio/voice","invalid",{})
     from twilio.request_validator import RequestValidator
-    signature=RequestValidator(s.twilio_token).compute_signature(s.public_url+"/twilio/media",{})
+    signature=RequestValidator(s.twilio_token).compute_signature(s.public_url.replace("https://","wss://")+"/twilio/media",{})
     assert v.validate("/twilio/media",signature,websocket=True)
     app=create_app(s)
     with TestClient(app,base_url=s.public_url) as c:
@@ -336,3 +336,58 @@ def test_api_probe_does_not_claim_live_voice(client,settings):
     result=c.post("/api/probe",headers=auth(settings)).json()
     assert result["voice_audio"]=="not_tested_requires_one_call_cost_approval"
     assert c.get("/api/status",headers=auth(settings)).json()["voice_live_verified"] is False
+
+def test_realtime_audio_and_appointment_bridge(settings,store):
+    s=voice_settings(settings)
+    v=Voice(s,store)
+    token=v.session(call_payload(),"approved-call","CA1")
+    appointment={"title":"Review","start":"2026-11-17T09:00:00-05:00",
+        "end":"2026-11-17T10:00:00-05:00","details":"Provisional"}
+    class Socket:
+        headers={"x-twilio-signature":"test"}
+        def __init__(self):
+            self.sent=[]
+            self.first=True
+        async def accept(self):
+            pass
+        async def close(self,**kw):
+            pass
+        async def receive_json(self):
+            if self.first:
+                self.first=False
+                return {"event":"start","start":{"accountSid":s.twilio_sid,"callSid":"CA1",
+                    "streamSid":"MZ1","mediaFormat":{"encoding":"audio/x-mulaw","sampleRate":8000},
+                    "customParameters":{"session":token}}}
+            await asyncio.Event().wait()
+        async def send_json(self,item):
+            self.sent.append(item)
+    class Model:
+        def __init__(self):
+            self.sent=[]
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self,*args):
+            pass
+        async def send(self,data):
+            self.sent.append(json.loads(data))
+        async def recv(self):
+            return json.dumps({"type":"session.updated"})
+        def __aiter__(self):
+            async def events():
+                for event in [
+                    {"type":"response.output_audio.delta","delta":"AAAA","item_id":"audio-item"},
+                    {"type":"response.function_call_arguments.done","name":"propose_appointment",
+                     "arguments":json.dumps(appointment),"call_id":"function1"},
+                    {"type":"response.done"},
+                ]:
+                    yield json.dumps(event)
+            return events()
+    socket,model=Socket(),Model()
+    with patch.object(v,"validate",return_value=True),patch("jarvis_service.voice.websockets.connect",return_value=model):
+        asyncio.run(v.bridge(socket))
+    assert any(e["event"]=="media" and e["media"]["payload"]=="AAAA" for e in socket.sent)
+    assert any(e["type"]=="session.update" for e in model.sent)
+    actions=store.actions()
+    assert len(actions)==1 and actions[0]["state"]=="pending"
+    assert actions[0]["kind"]=="create_appointment"
+    assert store.get("voice_session:"+token) is None

@@ -77,7 +77,7 @@ The app makes a fixed AI disclosure before the model speaks. It does not enable 
 
 ## Hosting proposal (requires cost approval)
 
-A paid always-on Render web service, one instance, and a 1 GB persistent disk are proposed in [render.yaml](render.yaml). A 2 GB RAM plan is selected to leave space for the upstream Python dependency stack; its live price must be reviewed in Render before applying. Telephony, a number, model usage, bandwidth and disk charges are separate. No resources have been provisioned and no number purchased by this change.
+A paid always-on Render web service, one instance, and a 1 GB persistent disk are proposed in [render.yaml](render.yaml). A 2 GB RAM plan is selected to leave space for the upstream Python dependency stack; its listed compute price is $25/month, plus $0.25/month for the 1 GB disk (checked November 16, 2026 at https://render.com/pricing.md). Review the actual workspace bill before applying. Telephony, a number, model usage, bandwidth and disk charges are separate. No resources have been provisioned and no number purchased by this change.
 
 Render's free web services sleep and lose local files; they are unsuitable for this durable agent. An external VPS with a persistent volume is also feasible. The Work conversation is not a 24/7 Python/WebSocket host.
 
