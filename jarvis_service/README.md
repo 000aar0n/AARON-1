@@ -107,3 +107,5 @@ The fixed lookback and 500-message cap are bounded monitoring, not a guaranteed 
 `python -m pytest -q jarvis_service/tests`
 
 The GitHub workflow installs the pinned upstream repository, checks dependency compatibility and syntax, runs offline contract/security tests, and parses the deployment YAML. These tests use fake Google/Twilio/model providers. They are not proof that school OAuth, billing, email sending or phone audio work live.
+
+After deployment, run `python -m jarvis_service.verify` with PUBLIC_URL, OWNER_TOKEN and GOOGLE_ALLOWED_EMAIL set privately. This only probes read access; it never sends, books, calls or spends on model inference. The CI container smoke test uses synthetic credentials and checks privilege drop, startup, authenticated access and persistence across a restart.

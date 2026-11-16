@@ -1,8 +1,5 @@
 name: Jarvis integration and security contracts
 on:
-  push:
-    branches: ["jarvis/personal-assistant"]
-    paths: ["jarvis_service/**", ".github/workflows/jarvis-tests.yml"]
   pull_request:
     paths: ["jarvis_service/**", ".github/workflows/jarvis-tests.yml"]
 permissions:
@@ -28,3 +25,7 @@ jobs:
         run: python -m pytest -q jarvis_service/tests
       - name: Validate deployment blueprint syntax
         run: python -c "import yaml; x=yaml.safe_load(open('jarvis_service/render.yaml')); assert x['services'][0]['numInstances']==1; assert x['services'][0]['disk']['mountPath']=='/var/lib/jarvis'"
+      - name: Build deployable container
+        run: docker build -f jarvis_service/Dockerfile -t jarvis-ci .
+      - name: Test container health, privilege drop and persistence
+        run: python jarvis_service/tests/container_smoke.py
