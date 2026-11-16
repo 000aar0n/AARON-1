@@ -1,0 +1,45 @@
+# PROPOSED PAID INFRASTRUCTURE. Do not apply until the owner approves provider costs.
+# Blueprint path: jarvis_service/render.yaml. Branch: jarvis/personal-assistant.
+services:
+  - type: web
+    name: aaron-jarvis
+    runtime: docker
+    plan: 1c-2g
+    region: virginia
+    branch: jarvis/personal-assistant
+    numInstances: 1
+    dockerfilePath: ./jarvis_service/Dockerfile
+    dockerContext: .
+    autoDeployTrigger: "off"
+    healthCheckPath: /healthz
+    disk:
+      name: jarvis-private-state
+      mountPath: /var/lib/jarvis
+      sizeGB: 1
+    envVars:
+      - key: PUBLIC_URL
+        sync: false
+      - key: OWNER_TOKEN
+        generateValue: true
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: GOOGLE_ALLOWED_EMAIL
+        value: c29ak@dalton.org
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: DATA_DIR
+        value: /var/lib/jarvis
+      - key: OPENJARVIS_HOME
+        value: /var/lib/jarvis/openjarvis
+      - key: MONITOR_SECONDS
+        value: "300"
+      - key: SCHEDULER_ENABLED
+        value: "true"
+      - key: TEXT_MODEL
+        value: gpt-4o-mini
+      - key: VOICE_MODEL
+        value: gpt-realtime
+# Add optional OPENAI_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN,
+# TWILIO_PHONE_NUMBER privately after provider accounts and charges are approved.

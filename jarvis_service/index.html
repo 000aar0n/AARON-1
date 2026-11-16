@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Jarvis · Owner console</title>
+<style>
+body{margin:0;background:#101215;color:#edf1f7;font:15px system-ui;line-height:1.6}main{max-width:1040px;margin:50px auto;padding:24px}
+h1{font-size:48px;letter-spacing:-2px;margin:0}h2{margin-top:36px}small,p{color:#acb7c7}
+button,input,textarea{font:inherit;border:1px solid #39424f;border-radius:8px;padding:10px;background:#1b2028;color:inherit}
+button{cursor:pointer;margin:5px}button:hover{border-color:#a6c8ff}input{min-width:260px}textarea{width:95%;min-height:170px}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#191e26;padding:16px;border-radius:8px}
+.card{border:1px solid #333e4d;border-radius:12px;margin:12px 0;padding:20px}.error{color:#ffabab}.pill{color:#a6c8ff}
+</style><script src="/ui.js" defer></script></head>
+<body><main><span class="pill">PERSONAL ASSISTANT · OWNER REVIEW</span><h1>Jarvis</h1>
+<p>Monitor, understand, and prepare. You approve each message, call, and commitment.</p>
+<p>Use your owner access token to unlock this console. It stays in this tab's memory.</p>
+<input id="token" type="password" placeholder="Owner access token" autocomplete="off">
+<button id="unlock">Unlock</button><button id="lock">Lock</button><p id="error" class="error"></p>
+<div id="console" hidden>
+<button id="connect">Sign in to school Google account</button><button id="probe">Test connections</button>
+<button id="monitor">Check inbox</button><button id="refresh">Refresh</button>
+<button id="pause">Pause Jarvis and revoke unused allowances</button><button id="resume">Resume</button>
+<h2>Service status</h2><pre id="status"></pre>
+<h2>Approval queue</h2><p>Review the exact recipient, content, purpose, duration, and charges. Approval executes that action once. An uncertain outcome must be checked at the provider before retrying.</p><div id="actions"></div>
+<h2>Inbox</h2><p>AI responses are local drafts until you explicitly approve saving or sending them.</p><div id="inbox"></div>
+<h2>New proposal</h2><p>Use an exact JSON proposal. Available actions: send_email, save_draft, create_appointment, place_call, receive_call, inference_allowance. No delete or purchase tools are installed.</p>
+<textarea id="proposal" spellcheck="false">{"kind":"inference_allowance","payload":{"model":"gpt-4o-mini","requests":10,"hours":1,"cost_notice":"I approve model charges for this bounded allowance"}}</textarea>
+<button id="propose">Add for review</button><pre id="result"></pre>
+<h2>Audit log</h2><pre id="audit"></pre>
+</div></main></body></html>
