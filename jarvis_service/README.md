@@ -77,7 +77,7 @@ The app makes a fixed AI disclosure before the model speaks. It does not enable 
 
 ## Hosting proposal (requires cost approval)
 
-A paid always-on Render web service, one instance, and a 1 GB persistent disk are proposed in [render.yaml](render.yaml). A 2 GB RAM plan is selected to leave space for the upstream Python dependency stack; its listed compute price is $25/month, plus $0.25/month for the 1 GB disk (checked November 16, 2026 at https://render.com/pricing.md). Review the actual workspace bill before applying. Telephony, a number, model usage, bandwidth and disk charges are separate. No resources have been provisioned and no number purchased by this change.
+A paid always-on Render web service, one instance, and a 1 GB persistent disk are proposed in [render.yaml](render.yaml). The revised plan selects 512 MB RAM at $7/month plus $0.25/month for a 1 GB disk (https://render.com/pricing.md). Review the actual workspace bill before applying; the resource-limited CI check passed at about 90 MiB peak memory, with real voice load still untested. Telephony, a number, model usage, bandwidth and disk charges are separate. No resources have been provisioned and no number purchased by this change.
 
 Render's free web services sleep and lose local files; they are unsuitable for this durable agent. An external VPS with a persistent volume is also feasible. The Work conversation is not a 24/7 Python/WebSocket host.
 
@@ -115,3 +115,5 @@ After deployment, run `python -m jarvis_service.verify` with PUBLIC_URL, OWNER_T
 The revised proposal uses 0.5 CPU / 512 MB RAM ($7/month) plus a 1 GB persistent disk ($0.25/month), totaling $7.25/month before taxes/overages and provider usage. CI now tests a 512 MB container with swap disabled, the running server plus the real OpenJarvis inference pipeline with a mocked provider, and restart persistence. This is an initial capacity check, not a live simultaneous voice-load benchmark. Upgrade only after measured resource pressure and within the owner's approved ceiling.
 
 Initial deployment can generate OWNER_TOKEN and TOKEN_ENCRYPTION_KEY privately in Render, and derive its public origin from RENDER_EXTERNAL_URL. Google OAuth credentials are added privately later. All provider usage remains unavailable without credentials and explicit allowances.
+
+Deployment attempt status: the Render Blueprint exists with auto-sync disabled, but its first plan returned need_payment_info. It manages no resources. Add a payment method in Aaron Kotchen's Workspace → Billing, then retry planning. No paid service has started.

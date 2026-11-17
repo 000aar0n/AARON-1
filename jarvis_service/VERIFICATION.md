@@ -44,13 +44,13 @@ School third-party-app restrictions may require administrator approval. No brows
 
 ## Proposed hosting and approval
 
-The committed Blueprint proposes a new, separate Render web service, **1 CPU / 2 GB RAM**, one instance, with a **1 GB persistent disk**, in Virginia.
+The committed Blueprint proposes a new, separate Render web service, **0.5 CPU / 512 MB RAM**, one instance, with a **1 GB persistent disk**, in Virginia.
 
-Listed incremental baseline: **$25.25/month** ($25 compute + $0.25 disk), before taxes, bandwidth/build overages, account-plan charges or other extras. Source checked November 16, 2026: https://render.com/pricing.md
+Listed incremental baseline: **$7.25/month** ($7 compute + $0.25 disk), before taxes, bandwidth/build overages, account-plan charges or other extras. Source checked November 16, 2026: https://render.com/pricing.md
 
 A Twilio US local number is listed at $1.15/month; ordinary US local outbound calling is $0.014/minute, inbound is $0.0085/minute, and Media Streams is $0.0044/minute. OpenAI voice/text usage is additional. Destinations, provider features and taxes can change the bill. Source: https://www.twilio.com/en-us/voice/pricing/us
 
-No paid resource, number or service has been provisioned. No cost has been approved by the owner. The Render connection reports no selected workspace; the available workspace is **Aaron Kotchen's Workspace**. Confirm the target before planning/applying infrastructure. The next step is to prepare/review the provider's plan, then explicitly authorize its application.
+The owner accepted the previously quoted $25.25/month hosting baseline in **Aaron Kotchen's Workspace**. The revised proposed service is cheaper at $7.25/month before extras. A Render Blueprint was created with automatic syncing off; its first plan failed with **need_payment_info**. The Blueprint has **zero resources**, and no paid service or number has been provisioned. Add a payment method in the workspace's Billing page before retrying the plan. Blueprint ID: exs-dbtpjup42hec73akm2tg. Cost consent does not approve live phone/model usage.
 
 ## Work environment limitations
 
@@ -74,4 +74,4 @@ Off-host backup scheduling, production alerts, provider-wide billing caps, a dep
 
 ## Cost-reduction revision
 
-The owner accepted the previously quoted $25.25/month hosting ceiling and the named workspace. A smaller $7.25/month proposal (0.5 CPU / 512 MB plus 1 GB disk) is being tested before provisioning. Source and test changes are on the same draft PR. The 33-test/container evidence above describes the earlier runtime revision; the new resource-limited run must pass before claiming the smaller tier is verified. Acceptance of the hosting cost does not authorize live phone/model usage or substitute for the provider's required deployment-plan review.
+The owner accepted the previously quoted $25.25/month hosting ceiling and the named workspace. A smaller $7.25/month proposal (0.5 CPU / 512 MB plus 1 GB disk) has passed the capacity checks before provisioning. Source and test changes are on the same draft PR. The resource-limited revision passed 33 tests, Docker build and restart checks: https://github.com/000aar0n/AARON-1/actions/runs/43984557836 . Tested commit: edf336a5f8482e0bad484ca460ece553d6b733b7. The container was limited to 512 MB with swap disabled and 0.5 CPU, while the HTTP server and actual OpenJarvis SDK inference pipeline ran concurrently with only the provider response mocked. Peak cgroup memory was 94,359,552 bytes (about 90 MiB). This supports initial use of the smaller tier; real voice/concurrent-provider load is still untested. Acceptance of the hosting cost does not authorize live phone/model usage or substitute for the provider's required deployment-plan review.
