@@ -2,7 +2,7 @@
 
 This is a separate, reviewable personal-assistant service under AARON-1. The existing planner is not modified.
 
-**Status: 46 offline tests and container persistence checks passed; NOT an operational assistant.** Consult [VERIFICATION.md](VERIFICATION.md) for test evidence and blockers.
+**Status: hosting live; 46 offline tests passed. Google, model and phone activation remains incomplete.** Consult [VERIFICATION.md](VERIFICATION.md) for test evidence and blockers.
 
 ## Official OpenJarvis dependency
 
@@ -116,7 +116,7 @@ The revised proposal uses 0.5 CPU / 512 MB RAM ($7/month) plus a 1 GB persistent
 
 Initial deployment can generate OWNER_TOKEN and TOKEN_ENCRYPTION_KEY privately in Render, and derive its public origin from RENDER_EXTERNAL_URL. Google OAuth credentials are added privately later. All provider usage remains unavailable without credentials and explicit allowances.
 
-Deployment attempt status: the Render Blueprint exists with auto-sync disabled, but its first plan returned need_payment_info. It manages no resources. Add a payment method in Aaron Kotchen's Workspace → Billing, then retry planning. No paid service has started.
+Hosting is now deployed at https://aaron-jarvis-c31q.onrender.com . The server and 1 GB disk are provisioned; auto-sync remains disabled. External read-only health, UI and unauthenticated-access checks passed. Google/model/phone credentials and live integration tests remain outstanding.
 
 ## Natural-language personal assistant
 
@@ -133,3 +133,26 @@ The authenticated /api/capabilities endpoint reports implemented and unavailable
 No model receives the owner bearer token or an approval endpoint. Tool observations are untrusted data. All consequential external actions still enter the exact-payload approval queue. The UI displays provider receipts separately from model-generated prose.
 
 Verification for this revision: [46 tests and resource-limited container checks](https://github.com/000aar0n/AARON-1/actions/runs/43985658937), runtime commit 117369a92f7e1a222851504d6a75f948dd021b90. Peak memory was 94,613,504 bytes with the server and a mocked-provider OpenJarvis inference pipeline. Real voice/load tests remain outstanding.
+
+## Live hosting status
+
+The website is deployed at **https://aaron-jarvis-c31q.onrender.com**.
+
+- Render deployment: dep-dbtpsq142hec73albong, status **live**, finished November 16, 2026 at 7:24 PM America/New_York.
+- Deployed commit: 4d07335171d7729a1749be64e53c46ee93b82621.
+- Service: srv-dbtpsph42hec73albnog, 0.5 CPU / 512 MB RAM, one instance.
+- Disk: dsk-dbtpspp42hec73albo70, 1 GB at /var/lib/jarvis.
+- Baseline hosting is now provisioned at $7.25/month before taxes/overages. Provider inference and telephony remain unconfigured and are not included in that price.
+- Automatic code/Blueprint deployments remain off.
+- [Render service](https://dashboard.render.com/web/srv-dbtpsph42hec73albnog).
+- [External read-only verification](https://github.com/000aar0n/AARON-1/actions/runs/43987558236) passed: GET /healthz returned healthy JSON; the owner console and task UI loaded; /api/status, /api/tasks, /api/actions and /api/inbox returned HTTP 401 without owner credentials.
+- Render runtime logs reported successful application startup; no runtime startup error was observed.
+- Authenticated live-owner operations, Google consent, model inference, email sends, calls and calendar writes remain unverified.
+
+To unlock the console, retrieve OWNER_TOKEN privately from the service's Environment tab in Render and paste it into the console's Owner access token field. Do not put it in a URL or repository.
+
+Before school sign-in can work, configure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET privately for a Google OAuth web application, enable Gmail/Calendar/People APIs, and register this exact redirect:
+https://aaron-jarvis-c31q.onrender.com/oauth/google/callback
+
+Google credentials and OpenAI/Twilio keys have not been supplied. Adding a payment method and deploying the host does not connect these accounts or authorize paid provider usage. Complete the corresponding consent and approval flows, then perform live read probes and separately approved write/call tests.
+

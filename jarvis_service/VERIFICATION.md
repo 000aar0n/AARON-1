@@ -1,6 +1,30 @@
 # Verification and activation report
 
-**Jarvis is NOT operational and has not been deployed.**
+**Hosting is live and externally verified. Google, AI and phone integrations are not operational yet.**
+
+## Live hosting status
+
+The website is deployed at **https://aaron-jarvis-c31q.onrender.com**.
+
+- Render deployment: dep-dbtpsq142hec73albong, status **live**, finished November 16, 2026 at 7:24 PM America/New_York.
+- Deployed commit: 4d07335171d7729a1749be64e53c46ee93b82621.
+- Service: srv-dbtpsph42hec73albnog, 0.5 CPU / 512 MB RAM, one instance.
+- Disk: dsk-dbtpspp42hec73albo70, 1 GB at /var/lib/jarvis.
+- Baseline hosting is now provisioned at $7.25/month before taxes/overages. Provider inference and telephony remain unconfigured and are not included in that price.
+- Automatic code/Blueprint deployments remain off.
+- [Render service](https://dashboard.render.com/web/srv-dbtpsph42hec73albnog).
+- [External read-only verification](https://github.com/000aar0n/AARON-1/actions/runs/43987558236) passed: GET /healthz returned healthy JSON; the owner console and task UI loaded; /api/status, /api/tasks, /api/actions and /api/inbox returned HTTP 401 without owner credentials.
+- Render runtime logs reported successful application startup; no runtime startup error was observed.
+- Authenticated live-owner operations, Google consent, model inference, email sends, calls and calendar writes remain unverified.
+
+To unlock the console, retrieve OWNER_TOKEN privately from the service's Environment tab in Render and paste it into the console's Owner access token field. Do not put it in a URL or repository.
+
+Before school sign-in can work, configure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET privately for a Google OAuth web application, enable Gmail/Calendar/People APIs, and register this exact redirect:
+https://aaron-jarvis-c31q.onrender.com/oauth/google/callback
+
+Google credentials and OpenAI/Twilio keys have not been supplied. Adding a payment method and deploying the host does not connect these accounts or authorize paid provider usage. Complete the corresponding consent and approval flows, then perform live read probes and separately approved write/call tests.
+
+
 
 Runtime source tested: `04cd3544625c239b1baa1573d39c37e7de33fa1a`.
 Evidence: [GitHub CI run 43983670164](https://github.com/000aar0n/AARON-1/actions/runs/43983670164).
@@ -32,7 +56,7 @@ Tests cover encrypted persistence, expiration and exact-payload approval, concur
 | OpenJarvis model analysis | No billable inference | Private OpenAI API key and explicit bounded inference allowance |
 | Twilio account and number | No | Private Twilio credentials and an owned voice-capable number; run read-only account/number checks |
 | Outbound/inbound voice audio | No | Working public HTTPS/WSS host, Twilio webhook settings, model access and explicit approval of one short call in each direction |
-| 24/7 monitoring | Not running | External always-on deployment and Google OAuth refresh token; verify heartbeat and real recovery on that host |
+| 24/7 monitoring | Host running; school monitoring inactive | External always-on deployment and Google OAuth refresh token; verify heartbeat and real recovery on that host |
 
 The initial ChatGPT connector checks succeeded for the connected **personal** Google account. They provide **no evidence** that `c29ak@dalton.org` works and do not supply reusable hosted credentials. No school mailbox messages have been read by this service.
 
@@ -42,7 +66,7 @@ The service is configured for **c29ak@dalton.org**. After a host and OAuth clien
 
 School third-party-app restrictions may require administrator approval. No browser-session export, cookie capture, password login automation or policy bypass is implemented.
 
-## Proposed hosting and approval
+## Hosting approval and earlier provisioning attempt
 
 The committed Blueprint proposes a new, separate Render web service, **0.5 CPU / 512 MB RAM**, one instance, with a **1 GB persistent disk**, in Virginia.
 
@@ -50,7 +74,7 @@ Listed incremental baseline: **$7.25/month** ($7 compute + $0.25 disk), before t
 
 A Twilio US local number is listed at $1.15/month; ordinary US local outbound calling is $0.014/minute, inbound is $0.0085/minute, and Media Streams is $0.0044/minute. OpenAI voice/text usage is additional. Destinations, provider features and taxes can change the bill. Source: https://www.twilio.com/en-us/voice/pricing/us
 
-The owner accepted the previously quoted $25.25/month hosting baseline in **Aaron Kotchen's Workspace**. The revised proposed service is cheaper at $7.25/month before extras. A Render Blueprint was created with automatic syncing off; its first plan failed with **need_payment_info**. The Blueprint has **zero resources**, and no paid service or number has been provisioned. Add a payment method in the workspace's Billing page before retrying the plan. Blueprint ID: exs-dbtpjup42hec73akm2tg. Cost consent does not approve live phone/model usage.
+The owner approved deployment in **Aaron Kotchen's Workspace**. The initial billing blocker was cleared, a fresh plan succeeded, and the Blueprint was applied. The server and disk are now provisioned; see Live hosting status above. No phone number was purchased and no live provider usage was activated. Blueprint ID: exs-dbtpjup42hec73akm2tg.
 
 ## Work environment limitations
 
@@ -86,4 +110,4 @@ The task model never executes an external write directly. Only the owner approva
 
 Capabilities are limited to installed adapters. General explanations and writing/code drafting can be produced through the model; monitored inbox reads, contact lookup, calendar checks and reviewed email/call/appointment actions are implemented. **Universal website/computer control is not implemented.** Browser automation, web research, purchases, data deletion, remote code execution and unconnected apps are explicitly reported as unavailable.
 
-This does not change activation status: the service is not deployed, Render still requires payment information, school OAuth and provider credentials remain absent, and live email/call/booking tests are unverified.
+Hosting was subsequently deployed and verified as documented above. School OAuth and provider credentials remain absent, and live email/call/booking tests remain unverified.
