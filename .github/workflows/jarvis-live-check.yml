@@ -1,0 +1,20 @@
+name: Verify live Jarvis website
+on:
+  push:
+    branches: ["jarvis/personal-assistant"]
+    paths: [".github/workflows/jarvis-live-check.yml", "jarvis_service/tests/hosted_smoke.py"]
+permissions:
+  contents: read
+jobs:
+  hosted:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Read-only live health, UI and authentication checks
+        env:
+          JARVIS_CHECK_URL: https://aaron-jarvis-c31q.onrender.com
+        run: python jarvis_service/tests/hosted_smoke.py

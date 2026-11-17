@@ -1,0 +1,29 @@
+"""Read-only external deployment smoke test. No credentials or paid provider calls."""
+import json
+import os
+import urllib.request
+from urllib.error import HTTPError
+from urllib.parse import urlsplit
+
+origin=os.environ["JARVIS_CHECK_URL"].rstrip("/")
+u=urlsplit(origin)
+assert u.scheme=="https" and u.hostname=="aaron-jarvis-c31q.onrender.com"
+def read(path):
+    with urllib.request.urlopen(origin+path,timeout=30) as r:
+        return r.status,r.headers,r.read()
+status,headers,body=read("/healthz")
+health=json.loads(body)
+assert status==200 and health["status"]=="healthy"
+assert headers["Cache-Control"]=="no-store"
+status,_,body=read("/")
+assert status==200 and b"Talk to Jarvis" in body and b"Owner access token" in body
+status,_,body=read("/ui.js")
+assert status==200 and b"/api/tasks" in body
+for path in ["/api/status","/api/tasks","/api/actions","/api/inbox"]:
+    try:
+        read(path)
+        raise AssertionError("Private endpoint was accessible: "+path)
+    except HTTPError as e:
+        assert e.code==401, (path,e.code)
+print("PASS: live health, owner console, task UI and authentication")
+print("NOT TESTED: authenticated owner session, Google consent, model inference, calls or writes")
