@@ -2,7 +2,7 @@
 
 This is a separate, reviewable personal-assistant service under AARON-1. The existing planner is not modified.
 
-**Status: implementation prepared, NOT an operational assistant.** Consult [VERIFICATION.md](VERIFICATION.md) for test evidence and blockers.
+**Status: 33 offline tests and container persistence checks passed; NOT an operational assistant.** Consult [VERIFICATION.md](VERIFICATION.md) for test evidence and blockers.
 
 ## Official OpenJarvis dependency
 
