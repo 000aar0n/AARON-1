@@ -7,7 +7,7 @@
 The website is deployed at **https://aaron-jarvis-c31q.onrender.com**.
 
 - Render deployment: dep-dbtpsq142hec73albong, status **live**, finished November 16, 2026 at 7:24 PM America/New_York.
-- Latest deployed commit: bbccbf2e0d63790f623a081b687bce182f06c6d7.
+- Latest deployed commit: a2ca26869115ca2a4106798db7dd0ff0e079dfc0.
 - Service: srv-dbtpsph42hec73albnog, 0.5 CPU / 512 MB RAM, one instance.
 - Disk: dsk-dbtpspp42hec73albo70, 1 GB at /var/lib/jarvis.
 - Baseline hosting is now provisioned at $7.25/month before taxes/overages. Provider inference and telephony remain unconfigured and are not included in that price.
@@ -136,4 +136,4 @@ Latest deployed runtime: **a2ca26869115ca2a4106798db7dd0ff0e079dfc0**. Deploymen
 
 A new test exercises the actual official SDK wrapper and verifies that exact recipient addresses survive model input/output. Automatic PII redaction is disabled specifically for requested task content because replacing email addresses prevents valid drafts; credential secret scanning is retained. The UI explains that relevant task, email and contact data is processed by OpenAI. Model calls remain allowance-gated and external actions remain owner-approved.
 
-The external setup-page/authentication check for the earlier repair passed at https://github.com/000aar0n/AARON-1/actions/runs/43991025942 . The live checker is being run again against the final recipient-data revision. Real provider credentials and consent are still outstanding; external integrations must not be reported as operational based on these tests.
+The external setup-page/authentication check for the earlier repair passed at https://github.com/000aar0n/AARON-1/actions/runs/43991025942 . The final recipient-data revision passed its external live check: https://github.com/000aar0n/AARON-1/actions/runs/43992107098 . The check confirmed healthy JSON, the new setup forms and privacy notice, and HTTP 401 protection for private status/tasks/actions/inbox/setup/session endpoints. Real provider credentials and consent are still outstanding; external integrations must not be reported as operational based on these tests.
