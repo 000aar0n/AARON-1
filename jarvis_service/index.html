@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Jarvis · Owner console</title>
+<style>
+body{margin:0;background:#101215;color:#edf1f7;font:15px system-ui;line-height:1.6}main{max-width:1040px;margin:50px auto;padding:24px}
+h1{font-size:48px;letter-spacing:-2px;margin:0}h2{margin-top:36px}small,p{color:#acb7c7}
+button,input,textarea{font:inherit;border:1px solid #39424f;border-radius:8px;padding:10px;background:#1b2028;color:inherit}
+button{cursor:pointer;margin:5px}button:hover{border-color:#a6c8ff}input{min-width:260px}textarea{width:95%;min-height:170px}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#191e26;padding:16px;border-radius:8px}
+.card{border:1px solid #333e4d;border-radius:12px;margin:12px 0;padding:20px}.error{color:#ffabab}.pill{color:#a6c8ff}
+a{color:#a9ccff}.panel{border:1px solid #333e4d;padding:24px;border-radius:14px;margin:24px 0}
+.setup-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.setup-grid .card{margin:0}label{display:block;margin-top:14px;color:#aebbd0;font-size:13px}
+label input{width:92%;min-width:0;margin-top:6px}details{margin:14px 0}summary{cursor:pointer;color:#a9ccff}
+[hidden]{display:none!important}button:disabled{opacity:.45;cursor:default}
+.voice-panel{text-align:center;padding:36px 24px}.voice-panel h2{font-size:34px;margin:0}
+.voice-orb{display:block;width:150px;height:150px;border-radius:50%;margin:24px auto;font-size:24px;font-weight:700;background:#c9f66a;color:#172500;border:0}
+.voice-panel[data-state="listening"] .voice-orb{animation:breathe 1.4s ease-in-out infinite;box-shadow:0 0 0 16px #c9f66a19}
+.voice-panel[data-state="thinking"] .voice-orb{background:#8db9ff;animation:breathe 2s ease-in-out infinite}
+.voice-panel[data-state="speaking"] .voice-orb{background:#d0b5ff;animation:breathe .8s ease-in-out infinite}
+.voice-caption{font-size:19px;max-width:760px;margin:12px auto}.voice-note{font-size:12px;color:#8190a6;max-width:700px;margin:20px auto}
+@keyframes breathe{50%{box-shadow:0 0 0 20px #c9f66a25}}@media(prefers-reduced-motion:reduce){.voice-orb{animation:none!important}}
+</style><script src="/speech.js" defer></script><script src="/ui.js" defer></script></head>
+<body><main><span class="pill">PERSONAL ASSISTANT · OWNER REVIEW</span><h1>Jarvis</h1>
+<p>Monitor, understand, and prepare. You approve each message, call, and commitment.</p>
+<p id="login-help">Enter your Owner access token once. This browser stays signed in securely for 12 hours.</p>
+<details id="login-guide"><summary>First time? Find your access token</summary><p>Open <a href="https://dashboard.render.com/web/srv-dbtpsph42hec73albnog" target="_blank" rel="noopener noreferrer">your Render service</a>, choose <strong>Environment</strong>, and copy the value beside <strong>OWNER_TOKEN</strong>. Paste it below. You only need this once per session.</p></details>
+<input id="token" type="password" placeholder="Owner access token" autocomplete="off">
+<button id="unlock">Unlock</button><button id="lock" hidden>Sign out</button><p id="error" class="error"></p>
+<div id="console" hidden>
+<section id="voice-panel" class="panel voice-panel" data-state="idle">
+<h2>Talk to Jarvis</h2><p>Tap once, speak, and hear Jarvis answer. It listens again when its reply finishes.</p>
+<button id="talk" class="voice-orb" aria-label="Talk to Jarvis">Talk</button>
+<button id="new-topic">New conversation</button>
+<p id="voice-state" role="status" aria-live="polite">Voice is off. Tap Talk to start.</p>
+<p id="voice-heard" class="voice-caption"></p><p id="voice-reply" class="voice-caption"></p>
+<p class="voice-note">Your browser handles microphone recognition and spoken playback. Its speech provider may process audio. Jarvis stores the transcript encrypted, not the raw microphone audio.</p>
+</section>
+
+<details class="panel" id="setup-panel" open><summary>Connections and one-time setup</summary>
+<h2>Finish setup</h2><p id="setup-summary">Checking connections…</p>
+<div class="setup-grid">
+<div class="card"><h3>1 · AI voice</h3><p id="model-state"></p>
+<p>Add an OpenAI API key privately here. Saving it does not start paid usage. Task content, including relevant email and contact details, is sent to OpenAI when you ask Jarvis to use it.</p>
+<label>OpenAI API key<input id="openai-key" type="password" autocomplete="off" placeholder="Enter a new key"></label>
+<button id="save-model">Save key</button><a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">Create API key</a>
+<label>AI requests to approve<input id="allowance-requests" type="number" min="1" max="100" value="10"></label>
+<label>Allowance duration (hours)<input id="allowance-hours" type="number" min="1" max="24" value="1"></label>
+<button id="review-allowance">Review AI usage allowance</button></div>
+<div class="card"><h3>2 · School Google account</h3><p id="google-state"></p>
+<details id="google-config"><summary>Configure Google sign-in</summary>
+<p>Google requires an OAuth web app first. In <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Google Cloud</a>, enable Gmail, Calendar and People APIs and create a Web application OAuth client. Register this exact redirect:</p><pre id="redirect-uri"></pre>
+<label>Google OAuth client ID<input id="google-client-id" autocomplete="off" placeholder="Client ID ending in apps.googleusercontent.com"></label>
+<label>Google OAuth client secret<input id="google-client-secret" type="password" autocomplete="off"></label>
+<button id="save-google">Save Google configuration</button></details>
+<button id="connect">Sign in to school Google account</button>
+<p>You enter your school password only on Google's own sign-in page.</p></div>
+<div class="card"><h3>3 · Phone assistant</h3><p id="phone-state"></p>
+<details><summary>Configure calling</summary><p>Add credentials from <a href="https://console.twilio.com" target="_blank" rel="noopener noreferrer">Twilio</a>. Each call still needs your approval.</p>
+<label>Twilio Account SID<input id="twilio-sid" autocomplete="off"></label>
+<label>Twilio Auth Token<input id="twilio-token" type="password" autocomplete="off"></label>
+<label>Twilio phone number<input id="twilio-number" placeholder="+12125550100" autocomplete="off"></label>
+<button id="save-phone">Save phone configuration</button><p>Incoming voice webhook:</p><pre id="phone-webhook"></pre></details></div>
+</div><button id="probe">Check connections without placing calls</button><p id="setup-result"></p>
+</details>
+
+
+<button id="monitor">Check inbox</button><button id="refresh">Refresh</button>
+<button id="pause">Pause Jarvis and revoke unused allowances</button><button id="resume">Resume</button>
+<details id="text-mode"><summary>Optional text mode</summary>
+<p id="chat-guidance">Describe a task in plain English. Jarvis can read connected information, draft writing, and prepare actions for review. Model requests use your approved allowance.</p>
+<textarea id="task-input" maxlength="4000" placeholder="Find a free hour next week, look up the contact, and draft an invitation for me to review."></textarea>
+<button id="task-submit">Work on this</button>
+<div id="tasks"></div></details>
+<h2>Service status</h2><pre id="status"></pre>
+<h2>Approval queue</h2><p>Review the exact recipient, content, purpose, duration, and charges. Approval executes that action once. An uncertain outcome must be checked at the provider before retrying.</p><div id="actions"></div>
+<h2>Inbox</h2><p>AI responses are local drafts until you explicitly approve saving or sending them.</p><div id="inbox"></div>
+<details><summary>Advanced controls and audit log</summary><h2>New proposal</h2><p>Use an exact JSON proposal. Available actions: send_email, save_draft, create_appointment, place_call, receive_call, inference_allowance. No delete or purchase tools are installed.</p>
+<textarea id="proposal" spellcheck="false">{"kind":"inference_allowance","payload":{"model":"gpt-4o-mini","requests":10,"hours":1,"cost_notice":"I approve model charges for this bounded allowance"}}</textarea>
+<button id="propose">Add for review</button><pre id="result"></pre>
+<h2>Audit log</h2><pre id="audit"></pre></details>
+</div></main></body></html>
