@@ -92,10 +92,10 @@ def main():
                   window.voiceRecognitions.at(-1).onresult({resultIndex:0,results:[r]});
                 }""")
                 expect(page.locator("#voice-reply")).to_contain_text("Hello Aaron")
-                page.wait_for_function("window.voiceUtterances.length === 1")
+                page.wait_for_function("() => window.voiceUtterances.length === 1")
                 assert page.evaluate("window.voiceUtterances[0].text").startswith("Hello Aaron")
                 page.evaluate("window.voiceUtterances[0].onend()")
-                page.wait_for_function("window.voiceRecognitions.length === 2")
+                page.wait_for_function("() => window.voiceRecognitions.length === 2")
                 page.locator("#talk").click()
                 expect(page.locator("#voice-state")).to_contain_text("Voice is off")
                 cookies=context.cookies()
