@@ -9,7 +9,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import parse_qs
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, WebSocket
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 from .config import Settings
 from .store import Store
@@ -18,6 +19,7 @@ from .google import Google
 from .inbox import Brain, Inbox
 from .voice import Voice
 from .tasks import Tasks, TaskRequest
+from .setup import RuntimeSettings, Sessions, Login, ProviderSettings
 
 class Executor:
     def __init__(self, settings, store, google, voice):
@@ -61,6 +63,8 @@ class Executor:
 def create_app(settings=None, google_override=None, voice_override=None, brain_override=None):
     s = (settings or Settings.from_env()).validate()
     store = Store(s.data_dir, s.encryption_key)
+    s = RuntimeSettings(s, store)
+    sessions = Sessions(s, store)
     google = google_override or Google(s, store)
     voice = voice_override or Voice(s, store)
     brain = brain_override or Brain(s, store)
@@ -97,9 +101,17 @@ def create_app(settings=None, google_override=None, voice_override=None, brain_o
     app.state.store, app.state.inbox, app.state.google = store, inbox, google
     app.state.voice, app.state.executor, app.state.tasks = voice, executor, tasks
 
-    def owner(authorization: str | None = Header(default=None)):
-        if not authorization or not secrets.compare_digest(authorization, "Bearer "+s.owner_token):
-            raise HTTPException(401, "Owner authentication required")
+    def owner(request: Request, authorization: str | None = Header(default=None)):
+        if authorization and secrets.compare_digest(authorization, "Bearer "+s.owner_token):
+            return
+        session=sessions.get(request.cookies.get("jarvis_session",""))
+        if not session:
+            raise HTTPException(401, "Sign in with your owner access token")
+        if request.method not in ("GET","HEAD","OPTIONS"):
+            if request.headers.get("origin")!=s.public_url or not secrets.compare_digest(
+                request.headers.get("x-jarvis-csrf",""),session["csrf"]):
+                raise HTTPException(403, "Refresh the page and try again")
+
 
     @app.middleware("http")
     async def headers(request, call_next):
@@ -111,6 +123,13 @@ def create_app(settings=None, google_override=None, voice_override=None, brain_o
             "Strict-Transport-Security": "max-age=31536000",
         })
         return response
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_input(request,exc):
+        # Never echo a provider secret in a validation response.
+        return JSONResponse({"error":"Some fields are invalid. Check the form and try again.",
+            "fields":[{"field":".".join(str(p) for p in e["loc"]),"type":e["type"]} for e in exc.errors()]},
+            status_code=422)
 
     @app.exception_handler(Exception)
     async def unexpected(request, exc):
@@ -142,6 +161,34 @@ def create_app(settings=None, google_override=None, voice_override=None, brain_o
     @app.get("/ui.js")
     def script():
         return FileResponse(Path(__file__).with_name("ui.js"), media_type="application/javascript")
+
+    @app.post("/api/session/login")
+    def login(request: Request, payload: Login, response: Response):
+        if request.headers.get("origin") and request.headers["origin"]!=s.public_url:
+            raise HTTPException(403,"Open Jarvis directly before signing in")
+        cookie,csrf=sessions.login(payload.token.get_secret_value(),request.client.host if request.client else "unknown")
+        response.set_cookie("jarvis_session",cookie,secure=True,httponly=True,
+                            samesite="strict",max_age=43200,path="/")
+        return {"authenticated":True,"csrf_token":csrf}
+
+    @app.get("/api/session",dependencies=[Depends(owner)])
+    def session(request: Request):
+        current=sessions.get(request.cookies.get("jarvis_session",""))
+        return {"authenticated":True,"csrf_token":current["csrf"] if current else None}
+
+    @app.post("/api/session/logout",dependencies=[Depends(owner)])
+    def logout(request: Request,response: Response):
+        sessions.logout(request.cookies.get("jarvis_session",""))
+        response.delete_cookie("jarvis_session",secure=True,httponly=True,samesite="strict",path="/")
+        return {"authenticated":False}
+
+    @app.get("/api/setup",dependencies=[Depends(owner)])
+    def setup_status():
+        return s.summary()
+
+    @app.put("/api/settings",dependencies=[Depends(owner)])
+    def save_settings(payload: ProviderSettings):
+        return s.update(payload)
 
     @app.get("/api/status", dependencies=[Depends(owner)])
     def status():
@@ -194,15 +241,25 @@ def create_app(settings=None, google_override=None, voice_override=None, brain_o
         return {"url": url}
 
     @app.get("/oauth/google/callback")
-    def oauth_callback(request: Request, state: str, code: str):
-        google.complete(state, code, request.cookies.get("jarvis_oauth", ""))
-        response = JSONResponse({"status": "connected", "next": "Return to the console and run integration checks"})
-        response.delete_cookie("jarvis_oauth", path="/oauth/google/callback", secure=True, httponly=True, samesite="lax")
+    def oauth_callback(request: Request, state: str="", code: str="", error: str=""):
+        outcome="connected"
+        try:
+            if error or not state or not code:
+                raise PermissionError("Google authorization did not complete")
+            google.complete(state,code,request.cookies.get("jarvis_oauth",""))
+            store.put("google_last_error",None)
+        except Exception as exc:
+            outcome="error"
+            store.put("google_last_error",{"code":error if error in ("access_denied","admin_policy_enforced") else "authorization_failed",
+                                           "error_type":type(exc).__name__,"at":time.time()})
+            store.audit("google_authorization_failed",code=type(exc).__name__)
+        response=RedirectResponse(s.public_url+"/?google="+outcome,status_code=303)
+        response.delete_cookie("jarvis_oauth",path="/oauth/google/callback",secure=True,httponly=True,samesite="lax")
         return response
 
     @app.post("/api/probe", dependencies=[Depends(owner)])
     def probe():
-        return {"google": google.probe(), "twilio": voice.probe(),
+        return {"google": google.probe(), "twilio": voice.probe(), "model": brain.probe(),
                 "voice_audio": "not_tested_requires_one_call_cost_approval",
                 "email_send": "not_tested_requires_exact_message_approval",
                 "appointment_write": "not_tested_requires_exact_appointment_approval"}

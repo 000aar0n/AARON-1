@@ -68,8 +68,10 @@ class Brain:
         cfg.analytics.enabled = False
         cfg.security.audit_log_path = ":memory:"
         prompt = instructions+"\nDATA:\n"+json.dumps(data, ensure_ascii=False)[:24000]
-        with Jarvis(config=cfg, engine_key="cloud", model=self.s.text_model) as agent:
-            result = agent.ask(prompt, context=False, temperature=0.2, max_tokens=max_tokens)
+        from .inference import key_scope
+        with key_scope(self.s.openai_key):
+            with Jarvis(config=cfg, engine_key="personal_cloud", model=self.s.text_model) as agent:
+                result = agent.ask(prompt, context=False, temperature=0.2, max_tokens=max_tokens)
         fence = chr(96)*3
         if result.startswith(fence):
             result = result.strip().removeprefix(fence).removeprefix("json").removesuffix(fence).strip()
@@ -84,6 +86,22 @@ class Brain:
             "A suggested reply is a draft for owner review, never sent.")
         validated = Analysis.model_validate(self.complete_json(instructions, message)).model_dump()
         return {**validated, "method": "openjarvis", "model": self.s.text_model}
+
+    def probe(self):
+        if not self.s.openai_key:
+            return {"status":"not_configured"}
+        import httpx
+        try:
+            with httpx.Client(timeout=15) as client:
+                response=client.get("https://api.openai.com/v1/models",
+                    headers={"Authorization":"Bearer "+self.s.openai_key})
+                response.raise_for_status()
+            result={"status":"verified_key_only","at":time.time(),
+                    "notice":"Model inference and model-specific access remain untested"}
+        except Exception as exc:
+            result={"status":"blocked","error_type":type(exc).__name__,"at":time.time()}
+        self.store.put("model_probe",result)
+        return result
 
 class Inbox:
     def __init__(self, settings, store, google, brain):

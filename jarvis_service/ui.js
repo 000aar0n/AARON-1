@@ -1,9 +1,9 @@
 "use strict";
-let ownerToken = "";
+let csrfToken = "";
 const el = id => document.getElementById(id);
 async function api(path, method="GET", body) {
   const res = await fetch(path, {method, credentials:"same-origin",
-    headers:{"Authorization":"Bearer "+ownerToken, ...(body ? {"Content-Type":"application/json"} : {})},
+    headers:{...(csrfToken ? {"X-Jarvis-CSRF":csrfToken} : {}), ...(body ? {"Content-Type":"application/json"} : {})},
     ...(body ? {body:JSON.stringify(body)} : {})});
   const value = await res.json();
   if (!res.ok) throw new Error(JSON.stringify(value));
@@ -19,8 +19,9 @@ async function run(fn) {
   try { await fn(); } catch(e) { el("error").textContent=e.message; }
 }
 async function refresh() {
-  const [status, actions, inbox, audit, tasks] = await Promise.all([
-    api("/api/status"), api("/api/actions"), api("/api/inbox"), api("/api/audit"), api("/api/tasks")]);
+  const [status, actions, inbox, audit, tasks, setup] = await Promise.all([
+    api("/api/status"), api("/api/actions"), api("/api/inbox"), api("/api/audit"), api("/api/tasks"), api("/api/setup")]);
+  renderSetup(setup);
   show("status",status); show("audit",audit);
   el("tasks").replaceChildren();
   for (const task of tasks) {
@@ -70,9 +71,21 @@ async function refresh() {
     el("inbox").append(card);
   }
 }
-el("unlock").onclick=()=>run(async()=>{ownerToken=el("token").value;el("token").value="";await refresh();el("console").hidden=false;});
-el("lock").onclick=()=>{ownerToken="";el("token").value="";el("console").hidden=true;
-  for(const id of ["status","actions","inbox","audit","result","tasks"]) el(id).replaceChildren();};
+function signedIn(value) {
+  el("console").hidden=!value;
+  for (const id of ["token","unlock","login-help","login-guide"]) el(id).hidden=value;
+  el("lock").hidden=!value;
+}
+el("unlock").onclick=()=>run(async()=>{
+  const token=el("token").value.trim();
+  el("token").value="";
+  const session=await api("/api/session/login","POST",{token});
+  csrfToken=session.csrf_token;await refresh();signedIn(true);
+});
+el("lock").onclick=()=>run(async()=>{
+  await api("/api/session/logout","POST");csrfToken="";signedIn(false);
+  for(const id of ["status","actions","inbox","audit","result","tasks"]) el(id).replaceChildren();
+});
 el("refresh").onclick=()=>run(refresh);
 el("connect").onclick=()=>run(async()=>{const r=await api("/api/oauth/google/start","POST");window.location.assign(r.url);});
 for(const id of ["probe","monitor","pause","resume"]) el(id).onclick=()=>run(async()=>{
@@ -89,3 +102,55 @@ el("task-submit").onclick=()=>run(async()=>{
     el("task-input").value="";await refresh();
   } finally {el("task-submit").disabled=false;}
 });
+
+let modelName="gpt-4o-mini";
+function renderSetup(setup) {
+  modelName=setup.model.model;
+  el("model-state").textContent=!setup.model.configured ? "API key needed" :
+    setup.model.allowance_active ? "Key saved · usage allowance active" : "Key saved · approve an AI usage allowance below";
+  el("google-state").textContent=setup.google.connected ? "Google connected · run connection checks to verify access" :
+    setup.google.configured ? "Ready for your Google sign-in" : "OAuth configuration needed before sign-in";
+  if(setup.google.last_error) el("google-state").textContent+=" · Google returned "+setup.google.last_error.code;
+  el("phone-state").textContent=setup.phone.configured ?
+    "Credentials saved · live calling still needs an approved test" : "Twilio credentials needed";
+  el("redirect-uri").textContent=setup.google.redirect_uri;
+  el("phone-webhook").textContent=setup.phone.webhook;
+  el("connect").disabled=!setup.google.configured;
+  el("monitor").disabled=!setup.google.connected;
+  el("task-submit").disabled=!setup.model.configured || !setup.model.allowance_active;
+  el("chat-guidance").textContent=el("task-submit").disabled ?
+    "Finish AI chat setup and approve a bounded usage allowance before asking Jarvis to work." :
+    "Describe what you need. Jarvis will prepare consequential actions for your approval.";
+  el("setup-summary").textContent=setup.model.configured && setup.model.allowance_active ?
+    "AI chat is ready to try. Connect Google and phone features below as needed." :
+    "Start with AI chat. The remaining connections can be completed afterward.";
+}
+async function saveSettings(values,fields) {
+  await api("/api/settings","PUT",values);
+  for(const field of fields)el(field).value="";
+  el("setup-result").textContent="Saved privately. No paid usage or external actions were started.";
+  await refresh();
+}
+el("save-model").onclick=()=>run(()=>saveSettings({openai_key:el("openai-key").value.trim()},["openai-key"]));
+el("save-google").onclick=()=>run(()=>saveSettings({
+  google_client_id:el("google-client-id").value.trim(),
+  google_client_secret:el("google-client-secret").value.trim()
+},["google-client-id","google-client-secret"]));
+el("save-phone").onclick=()=>run(()=>saveSettings({
+  twilio_sid:el("twilio-sid").value.trim(),twilio_token:el("twilio-token").value.trim(),
+  twilio_number:el("twilio-number").value.trim()
+},["twilio-sid","twilio-token","twilio-number"]));
+el("review-allowance").onclick=()=>run(async()=>{
+  await api("/api/actions","POST",{kind:"inference_allowance",payload:{
+    model:modelName,requests:Number(el("allowance-requests").value),
+    hours:Number(el("allowance-hours").value),cost_notice:"I approve model charges for this bounded allowance"
+  }});
+  await refresh();el("actions").scrollIntoView({behavior:"smooth"});
+});
+async function restoreSession() {
+  try {
+    const session=await api("/api/session");csrfToken=session.csrf_token;
+    await refresh();signedIn(true);
+  } catch(e) {signedIn(false);}
+}
+restoreSession();
