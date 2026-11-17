@@ -40,7 +40,9 @@
     newTopic() {
       const wasActive=this.active;
       this.stop();this.conversationId=null;
-      if(wasActive){this.active=true;this.say("New conversation. What would you like to do?");}
+      if(wasActive){this.active=true;
+        this.deadlineTimer=root.setTimeout(()=>this.stop("Voice session ended. Tap Talk to continue."),15*60*1000);
+        this.say("New conversation. What would you like to do?");}
     }
     schedule() {
       root.clearTimeout(this.timer);
