@@ -21,11 +21,20 @@ assert b"Finish setup" in body and b'id="save-model"' in body and b'id="save-goo
 assert b"Task content, including relevant email and contact details" in body
 status,_,body=read("/ui.js")
 assert status==200 and b"/api/tasks" in body and b"/api/session/login" in body and b"/api/settings" in body
+status,_,body=read("/speech.js")
+assert status==200 and b"JarvisSpeech" in body
+assert b"/api/voice/turn" in read("/ui.js")[2]
+assert b'id="talk"' in read("/")[2]
+try:
+    urllib.request.urlopen(urllib.request.Request(origin+"/api/voice/turn",data=b"{}",headers={"Content-Type":"application/json"}),timeout=30)
+    raise AssertionError("Spoken endpoint was accessible")
+except HTTPError as e:
+    assert e.code==401
 for path in ["/api/status","/api/tasks","/api/actions","/api/inbox","/api/setup","/api/session"]:
     try:
         read(path)
         raise AssertionError("Private endpoint was accessible: "+path)
     except HTTPError as e:
         assert e.code==401, (path,e.code)
-print("PASS: live health, guided setup UI, session frontend and authentication on all private endpoints")
+print("PASS: live health, spoken UI/controller, protected voice endpoint, guided setup, session frontend and authentication on all private endpoints")
 print("NOT TESTED: authenticated owner session, Google consent, model inference, calls or writes")

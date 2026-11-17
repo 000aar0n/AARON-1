@@ -175,3 +175,16 @@ CI evidence: https://github.com/000aar0n/AARON-1/actions/runs/43990197452 . All 
 Runtime update: bbccbf2e0d63790f623a081b687bce182f06c6d7, deployed as dep-dbtq8vo8v5cc73b1limg. The first-time owner token remains necessary because the assistant is private. Actual provider credentials and school consent are still required for external integrations.
 
 Latest validated repair: runtime a2ca26869115ca2a4106798db7dd0ff0e079dfc0, Render deployment dep-dbtqcv67bikc73fe9670 (live). CI https://github.com/000aar0n/AARON-1/actions/runs/43991289440 passed 64 tests, real-browser setup, Docker build and resource-limited restart checks. This also fixes upstream PII redaction breaking exact recipient addresses: task/contact details needed for requested work are preserved, credential scanning remains enabled, and the setup panel discloses processing by OpenAI. No real provider operation was exercised.
+
+
+## Speak to Jarvis in the browser
+
+After the one-time private owner sign-in and AI setup, tap **Talk** and allow microphone access. Speak requests aloud; Jarvis speaks each answer and opens the microphone again after playback. Optional text mode stays collapsed. Say "stop" to stop listening, or "new conversation" to clear conversational context.
+
+Browser voice uses the browser's speech recognition and speech synthesis with the existing OpenJarvis text reasoning engine. It is a turn-taking spoken interface, not the OpenAI Realtime phone bridge. Browser voice quality and speech-service availability depend on the device/browser. No Twilio account or phone number is needed for browser conversation. OpenJarvis reasoning still requires a private OpenAI key and an owner-approved inference allowance; one spoken request can use multiple bounded planning calls.
+
+The browser's speech provider may process audio. The app receives text transcripts over the authenticated HTTPS API, encrypts conversation/task history, and does not receive or persist microphone audio. The browser must stay open and visible; voice stops on tab hiding, sign-out, pause, microphone errors or after 15 minutes. It is not an always-listening background wake-word app. Recognition pauses while Jarvis speaks to prevent its own playback being submitted as a request.
+
+Spoken requests can read information and prepare proposals. Spoken "yes" never approves sending, calling, booking or spending. Jarvis pauses and directs you to the exact approval card. Only the explicit owner approval flow executes an action; verified receipts determine spoken action results.
+
+Run controller checks with `node --test jarvis_service/tests/speech.test.cjs`. Browser CI injects synthetic microphone and speech output events with a mocked turn response; it verifies the interface and listening/playback cycle without paid inference. Real hardware microphone capture, speaker output and authenticated live AI responses remain user-side activation checks.
