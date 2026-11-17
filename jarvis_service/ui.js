@@ -19,9 +19,30 @@ async function run(fn) {
   try { await fn(); } catch(e) { el("error").textContent=e.message; }
 }
 async function refresh() {
-  const [status, actions, inbox, audit] = await Promise.all([
-    api("/api/status"), api("/api/actions"), api("/api/inbox"), api("/api/audit")]);
+  const [status, actions, inbox, audit, tasks] = await Promise.all([
+    api("/api/status"), api("/api/actions"), api("/api/inbox"), api("/api/audit"), api("/api/tasks")]);
   show("status",status); show("audit",audit);
+  el("tasks").replaceChildren();
+  for (const task of tasks) {
+    const card=document.createElement("div");card.className="card";
+    const title=document.createElement("strong");title.textContent=task.instruction;card.append(title);
+    const status=document.createElement("p");status.textContent="Task status: "+task.status+" · planning turns: "+task.turns;card.append(status);
+    const answer=document.createElement("pre");answer.textContent=task.answer;card.append(answer);
+    const notice=document.createElement("p");notice.textContent=task.notice;card.append(notice);
+    if(task.action_ids.length) {
+      const receipts=document.createElement("pre");
+      receipts.textContent=JSON.stringify(actions.filter(a=>task.action_ids.includes(a.id)).map(a=>({
+        action:a.kind,state:a.state,result:a.result
+      })),null,2);
+      card.append(receipts);
+    }
+    button("Follow up",async()=>{
+      const instruction=window.prompt("Add instructions or missing details. Never paste passwords or keys.");
+      if(!instruction)return;
+      await api("/api/tasks/"+task.id+"/continue","POST",{instruction});await refresh();
+    },card);
+    el("tasks").append(card);
+  }
   el("actions").replaceChildren();
   for (const a of actions) {
     const card=document.createElement("div");card.className="card";
@@ -51,10 +72,20 @@ async function refresh() {
 }
 el("unlock").onclick=()=>run(async()=>{ownerToken=el("token").value;el("token").value="";await refresh();el("console").hidden=false;});
 el("lock").onclick=()=>{ownerToken="";el("token").value="";el("console").hidden=true;
-  for(const id of ["status","actions","inbox","audit","result"]) el(id).replaceChildren();};
+  for(const id of ["status","actions","inbox","audit","result","tasks"]) el(id).replaceChildren();};
 el("refresh").onclick=()=>run(refresh);
 el("connect").onclick=()=>run(async()=>{const r=await api("/api/oauth/google/start","POST");window.location.assign(r.url);});
 for(const id of ["probe","monitor","pause","resume"]) el(id).onclick=()=>run(async()=>{
   show("result",await api("/api/"+id,"POST"));await refresh();});
 el("propose").onclick=()=>run(async()=>{
   show("result",await api("/api/actions","POST",JSON.parse(el("proposal").value)));await refresh();});
+
+el("task-submit").onclick=()=>run(async()=>{
+  const instruction=el("task-input").value.trim();
+  if(!instruction)return;
+  el("task-submit").disabled=true;
+  try {
+    show("result",await api("/api/tasks","POST",{instruction}));
+    el("task-input").value="";await refresh();
+  } finally {el("task-submit").disabled=false;}
+});

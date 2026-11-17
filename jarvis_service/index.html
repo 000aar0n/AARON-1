@@ -18,6 +18,11 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#191e26;padding:16px;
 <button id="connect">Sign in to school Google account</button><button id="probe">Test connections</button>
 <button id="monitor">Check inbox</button><button id="refresh">Refresh</button>
 <button id="pause">Pause Jarvis and revoke unused allowances</button><button id="resume">Resume</button>
+<h2>Talk to Jarvis</h2>
+<p>Describe a task in plain English. Jarvis can read connected information, draft writing, and prepare actions for review. Model requests use your approved allowance.</p>
+<textarea id="task-input" maxlength="4000" placeholder="Find a free hour next week, look up the contact, and draft an invitation for me to review."></textarea>
+<button id="task-submit">Work on this</button>
+<div id="tasks"></div>
 <h2>Service status</h2><pre id="status"></pre>
 <h2>Approval queue</h2><p>Review the exact recipient, content, purpose, duration, and charges. Approval executes that action once. An uncertain outcome must be checked at the provider before retrying.</p><div id="actions"></div>
 <h2>Inbox</h2><p>AI responses are local drafts until you explicitly approve saving or sending them.</p><div id="inbox"></div>

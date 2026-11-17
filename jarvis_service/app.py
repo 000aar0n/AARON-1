@@ -17,6 +17,7 @@ from .schemas import Proposal, Approval
 from .google import Google
 from .inbox import Brain, Inbox
 from .voice import Voice
+from .tasks import Tasks, TaskRequest
 
 class Executor:
     def __init__(self, settings, store, google, voice):
@@ -62,7 +63,9 @@ def create_app(settings=None, google_override=None, voice_override=None, brain_o
     store = Store(s.data_dir, s.encryption_key)
     google = google_override or Google(s, store)
     voice = voice_override or Voice(s, store)
-    inbox = Inbox(s, store, google, brain_override or Brain(s, store))
+    brain = brain_override or Brain(s, store)
+    inbox = Inbox(s, store, google, brain)
+    tasks = Tasks(s, store, google, inbox, brain)
     executor = Executor(s, store, google, voice)
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     for logger in ("httpx", "httpcore", "googleapiclient", "openai", "websockets"):
@@ -71,6 +74,8 @@ def create_app(settings=None, google_override=None, voice_override=None, brain_o
     async def scheduler():
         while True:
             try:
+                if not store.get("paused", False):
+                    await asyncio.to_thread(tasks.tick)
                 if not store.get("paused", False) and store.get("google_credentials"):
                     await asyncio.to_thread(inbox.run)
                 store.put("scheduler_heartbeat", time.time())
@@ -90,7 +95,7 @@ def create_app(settings=None, google_override=None, voice_override=None, brain_o
 
     app = FastAPI(title="Jarvis owner console", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.store, app.state.inbox, app.state.google = store, inbox, google
-    app.state.voice, app.state.executor = voice, executor
+    app.state.voice, app.state.executor, app.state.tasks = voice, executor, tasks
 
     def owner(authorization: str | None = Header(default=None)):
         if not authorization or not secrets.compare_digest(authorization, "Bearer "+s.owner_token):
@@ -154,6 +159,31 @@ def create_app(settings=None, google_override=None, voice_override=None, brain_o
             "voice_live_verified": False,
             "notice": "Configured is not operational; live send, booking and phone tests need approval.",
         }
+
+    @app.get("/api/capabilities", dependencies=[Depends(owner)])
+    def capabilities():
+        return {
+            "read": ["monitored_inbox", "contacts_search", "calendar_availability"],
+            "with_approval": ["send_email", "save_draft", "create_appointment", "place_call", "receive_call"],
+            "planning": ["general_questions", "draft_writing", "multi_step_tasks", "persistent_followup"],
+            "unavailable": ["arbitrary_computer_control", "browser_automation", "web_research",
+                            "purchases", "deletions", "code_execution", "unconnected_apps"],
+            "notice": "Available tools do not imply connected or live-verified integrations.",
+        }
+
+    @app.get("/api/tasks", dependencies=[Depends(owner)])
+    def list_tasks():
+        return tasks.list()
+
+    @app.post("/api/tasks", dependencies=[Depends(owner)])
+    def create_task(request: TaskRequest):
+        task = tasks.create(request.instruction)
+        return tasks.run(task["id"])
+
+    @app.post("/api/tasks/{task_id}/continue", dependencies=[Depends(owner)])
+    def continue_task(task_id: str, request: TaskRequest | None = None):
+        tasks.continue_task(task_id, request.instruction if request else "")
+        return tasks.run(task_id)
 
     @app.post("/api/oauth/google/start", dependencies=[Depends(owner)])
     def oauth_start(response: Response):
