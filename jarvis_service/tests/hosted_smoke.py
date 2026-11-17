@@ -18,6 +18,7 @@ assert headers["Cache-Control"]=="no-store"
 status,_,body=read("/")
 assert status==200 and b"Talk to Jarvis" in body and b"Owner access token" in body
 assert b"Finish setup" in body and b'id="save-model"' in body and b'id="save-google"' in body
+assert b"Task content, including relevant email and contact details" in body
 status,_,body=read("/ui.js")
 assert status==200 and b"/api/tasks" in body and b"/api/session/login" in body and b"/api/settings" in body
 for path in ["/api/status","/api/tasks","/api/actions","/api/inbox","/api/setup","/api/session"]:

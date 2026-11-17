@@ -2,7 +2,7 @@
 
 This is a separate, reviewable personal-assistant service under AARON-1. The existing planner is not modified.
 
-**Status: hosting live; 63 offline tests passed. Google, model and phone activation remains incomplete.** Consult [VERIFICATION.md](VERIFICATION.md) for test evidence and blockers.
+**Status: hosting live; 64 offline tests passed. Google, model and phone activation remains incomplete.** Consult [VERIFICATION.md](VERIFICATION.md) for test evidence and blockers.
 
 ## Official OpenJarvis dependency
 
@@ -173,3 +173,5 @@ The official OpenJarvis text engine now receives a request-scoped private OpenAI
 CI evidence: https://github.com/000aar0n/AARON-1/actions/runs/43990197452 . All 63 tests, JavaScript syntax, a real Chromium browser test over local HTTPS, Docker build and the 512 MB persistence test passed. Browser coverage includes login, reload persistence, private credential forms, budget approval, chat readiness and logout. The browser used only synthetic credentials; no provider consent or paid usage was exercised.
 
 Runtime update: bbccbf2e0d63790f623a081b687bce182f06c6d7, deployed as dep-dbtq8vo8v5cc73b1limg. The first-time owner token remains necessary because the assistant is private. Actual provider credentials and school consent are still required for external integrations.
+
+Latest validated repair: runtime a2ca26869115ca2a4106798db7dd0ff0e079dfc0, Render deployment dep-dbtqcv67bikc73fe9670 (live). CI https://github.com/000aar0n/AARON-1/actions/runs/43991289440 passed 64 tests, real-browser setup, Docker build and resource-limited restart checks. This also fixes upstream PII redaction breaking exact recipient addresses: task/contact details needed for requested work are preserved, credential scanning remains enabled, and the setup panel discloses processing by OpenAI. No real provider operation was exercised.

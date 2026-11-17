@@ -129,3 +129,11 @@ Verified in CI at https://github.com/000aar0n/AARON-1/actions/runs/43990197452 :
 The paid host is running. The app is not connected to Google, OpenAI or Twilio until the owner supplies valid provider settings and completes consent. First-time private access still requires the existing OWNER_TOKEN. The new app handles credential setup privately after that one unlock, and remembers the session for 12 hours. No Google password, provider keys or payment data need to be sent in chat.
 
 Configured and verified-read statuses remain separate from operational live send/call/booking tests. No additional external commitments, calls, emails or purchases were made during this repair.
+
+## Final recipient-data correction
+
+Latest deployed runtime: **a2ca26869115ca2a4106798db7dd0ff0e079dfc0**. Deployment **dep-dbtqcv67bikc73fe9670** is **live** (November 16, 2026 at 7:58 PM America/New_York). CI https://github.com/000aar0n/AARON-1/actions/runs/43991289440 passed **64 tests**, the real browser setup flow, JavaScript/Python checks, Docker build and 512 MB/no-swap persistence checks. Peak test cgroup memory: 94,646,272 bytes.
+
+A new test exercises the actual official SDK wrapper and verifies that exact recipient addresses survive model input/output. Automatic PII redaction is disabled specifically for requested task content because replacing email addresses prevents valid drafts; credential secret scanning is retained. The UI explains that relevant task, email and contact data is processed by OpenAI. Model calls remain allowance-gated and external actions remain owner-approved.
+
+The external setup-page/authentication check for the earlier repair passed at https://github.com/000aar0n/AARON-1/actions/runs/43991025942 . The live checker is being run again against the final recipient-data revision. Real provider credentials and consent are still outstanding; external integrations must not be reported as operational based on these tests.
