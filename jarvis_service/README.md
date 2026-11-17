@@ -2,7 +2,7 @@
 
 This is a separate, reviewable personal-assistant service under AARON-1. The existing planner is not modified.
 
-**Status: hosting live; 46 offline tests passed. Google, model and phone activation remains incomplete.** Consult [VERIFICATION.md](VERIFICATION.md) for test evidence and blockers.
+**Status: hosting live; 63 offline tests passed. Google, model and phone activation remains incomplete.** Consult [VERIFICATION.md](VERIFICATION.md) for test evidence and blockers.
 
 ## Official OpenJarvis dependency
 
@@ -156,3 +156,20 @@ https://aaron-jarvis-c31q.onrender.com/oauth/google/callback
 
 Google credentials and OpenAI/Twilio keys have not been supplied. Adding a payment method and deploying the host does not connect these accounts or authorize paid provider usage. Complete the corresponding consent and approval flows, then perform live read probes and separately approved write/call tests.
 
+
+## Guided setup and persistent sign-in
+
+The live app now provides a Finish setup panel instead of requiring provider credentials to be edited in Render. Unlock once with the existing OWNER_TOKEN from Render. The browser then uses a Secure, HttpOnly, SameSite=Strict cookie for a 12-hour session, restored across reloads. Sign out revokes the session. Cookie-authenticated writes require an exact origin and CSRF token; bearer API clients remain supported.
+
+Provider API keys and OAuth client settings can be entered privately in the app. They are encrypted in the existing durable SQLite store, are never returned by configuration reads, and take effect without a redeploy. Blank fields preserve existing values. Validation errors do not echo secrets. Saving credentials never grants an inference allowance or starts a call.
+
+1. Save an OpenAI API key under AI chat, then review a bounded usage allowance and approve its exact queue item. Chat stays disabled until both are available.
+2. Save the Google OAuth web client ID/secret under Google configuration, register the displayed exact redirect URL, and enable Gmail, Calendar and People APIs. Then sign in directly to Google. A Google password is never requested in Jarvis.
+3. Save Twilio credentials and the owned number under Phone assistant, configure the displayed webhook, and separately approve live call tests. The Twilio account can now be checked independently of the AI key.
+4. Check connections. AI credential checks use GET /v1/models, not paid inference. A successful key check is not proof that a particular model or live voice works.
+
+The official OpenJarvis text engine now receives a request-scoped private OpenAI key without using global environment credentials. It pins the OpenAI endpoint and disables SDK retries. Each analysis/planning invocation still requires an owner-approved allowance.
+
+CI evidence: https://github.com/000aar0n/AARON-1/actions/runs/43990197452 . All 63 tests, JavaScript syntax, a real Chromium browser test over local HTTPS, Docker build and the 512 MB persistence test passed. Browser coverage includes login, reload persistence, private credential forms, budget approval, chat readiness and logout. The browser used only synthetic credentials; no provider consent or paid usage was exercised.
+
+Runtime update: bbccbf2e0d63790f623a081b687bce182f06c6d7, deployed as dep-dbtq8vo8v5cc73b1limg. The first-time owner token remains necessary because the assistant is private. Actual provider credentials and school consent are still required for external integrations.

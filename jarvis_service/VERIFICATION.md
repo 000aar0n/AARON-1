@@ -7,7 +7,7 @@
 The website is deployed at **https://aaron-jarvis-c31q.onrender.com**.
 
 - Render deployment: dep-dbtpsq142hec73albong, status **live**, finished November 16, 2026 at 7:24 PM America/New_York.
-- Deployed commit: 4d07335171d7729a1749be64e53c46ee93b82621.
+- Latest deployed commit: bbccbf2e0d63790f623a081b687bce182f06c6d7.
 - Service: srv-dbtpsph42hec73albnog, 0.5 CPU / 512 MB RAM, one instance.
 - Disk: dsk-dbtpspp42hec73albo70, 1 GB at /var/lib/jarvis.
 - Baseline hosting is now provisioned at $7.25/month before taxes/overages. Provider inference and telephony remain unconfigured and are not included in that price.
@@ -111,3 +111,21 @@ The task model never executes an external write directly. Only the owner approva
 Capabilities are limited to installed adapters. General explanations and writing/code drafting can be produced through the model; monitored inbox reads, contact lookup, calendar checks and reviewed email/call/appointment actions are implemented. **Universal website/computer control is not implemented.** Browser automation, web research, purchases, data deletion, remote code execution and unconnected apps are explicitly reported as unavailable.
 
 Hosting was subsequently deployed and verified as documented above. School OAuth and provider credentials remain absent, and live email/call/booking tests remain unverified.
+
+## Setup repair deployed
+
+The setup repair is LIVE as deployment dep-dbtq8vo8v5cc73b1limg at runtime commit bbccbf2e0d63790f623a081b687bce182f06c6d7. The same service, disk, encryption key, owner token and baseline hosting plan are retained.
+
+Verified in CI at https://github.com/000aar0n/AARON-1/actions/runs/43990197452 :
+- **63 tests passed**, dependency checks and Python/JavaScript syntax checks passed.
+- Real Chromium setup flow passed over local HTTPS: login, HttpOnly secure cookie, automatic session restore after reload, encrypted credential forms, allowance queue approval, chat readiness and logout.
+- Docker build and 512 MB/no-swap/0.5 CPU startup, authentication and persistence checks passed.
+- Peak test cgroup memory: 94,138,368 bytes.
+- Real Google OAuth library URL generation was tested for PKCE, offline access and exact redirect.
+- Twilio read-only account checking no longer unnecessarily requires an OpenAI key.
+- OpenJarvis resolves the request-scoped personal cloud engine without global credential mutation. Provider inference was mocked; no actual model charge was incurred by tests.
+- Secret fields are not echoed in configuration reads or validation errors, arbitrary owner-key replacement is rejected, and missing credentials disable dependent UI actions.
+
+The paid host is running. The app is not connected to Google, OpenAI or Twilio until the owner supplies valid provider settings and completes consent. First-time private access still requires the existing OWNER_TOKEN. The new app handles credential setup privately after that one unlock, and remembers the session for 12 hours. No Google password, provider keys or payment data need to be sent in chat.
+
+Configured and verified-read statuses remain separate from operational live send/call/booking tests. No additional external commitments, calls, emails or purchases were made during this repair.

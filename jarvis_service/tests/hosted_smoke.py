@@ -17,13 +17,14 @@ assert status==200 and health["status"]=="healthy"
 assert headers["Cache-Control"]=="no-store"
 status,_,body=read("/")
 assert status==200 and b"Talk to Jarvis" in body and b"Owner access token" in body
+assert b"Finish setup" in body and b'id="save-model"' in body and b'id="save-google"' in body
 status,_,body=read("/ui.js")
-assert status==200 and b"/api/tasks" in body
-for path in ["/api/status","/api/tasks","/api/actions","/api/inbox"]:
+assert status==200 and b"/api/tasks" in body and b"/api/session/login" in body and b"/api/settings" in body
+for path in ["/api/status","/api/tasks","/api/actions","/api/inbox","/api/setup","/api/session"]:
     try:
         read(path)
         raise AssertionError("Private endpoint was accessible: "+path)
     except HTTPError as e:
         assert e.code==401, (path,e.code)
-print("PASS: live health, owner console, task UI and authentication")
+print("PASS: live health, guided setup UI, session frontend and authentication on all private endpoints")
 print("NOT TESTED: authenticated owner session, Google consent, model inference, calls or writes")
