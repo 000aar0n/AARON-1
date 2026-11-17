@@ -170,3 +170,30 @@ def test_missing_provider_config_blocks_signin_in_setup_status(client,settings):
     assert not data["model"]["configured"] and not data["google"]["configured"]
     assert data["google"]["redirect_uri"]==settings.public_url+"/oauth/google/callback"
     assert not data["phone"]["configured"]
+
+def test_real_google_authorization_url_contains_pkce_without_network(settings):
+    from urllib.parse import urlsplit,parse_qs
+    from jarvis_service.google import Google
+    store=Store(settings.data_dir,settings.encryption_key)
+    g=Google(replace(settings,google_client_id="synthetic.apps.googleusercontent.com",
+                     google_client_secret="synthetic-google-secret"),store)
+    url=g.start("browser-binding")
+    parts=urlsplit(url)
+    query=parse_qs(parts.query)
+    assert parts.hostname=="accounts.google.com"
+    assert query["code_challenge_method"]==["S256"]
+    assert query["access_type"]==["offline"]
+    assert query["redirect_uri"]==[settings.public_url+"/oauth/google/callback"]
+    assert query["login_hint"]==[settings.google_email]
+    saved=store.get("oauth:"+query["state"][0])
+    assert saved["binding"]=="browser-binding" and saved["verifier"]
+
+def test_twilio_account_probe_does_not_require_openai_key(settings):
+    from jarvis_service.voice import Voice
+    store=Store(settings.data_dir,settings.encryption_key)
+    s=replace(settings,twilio_sid="AC123",twilio_token="synthetic-token",openai_key="")
+    with patch("jarvis_service.voice.Client") as client:
+        client.return_value.api.accounts.return_value.fetch.return_value.status="active"
+        result=Voice(s,store).probe()
+    assert result["status"]=="verified_account_only"
+    assert result["account_status"]=="active"

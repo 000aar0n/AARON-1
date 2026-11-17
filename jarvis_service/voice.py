@@ -62,7 +62,8 @@ class Voice:
             raise PermissionError("Twilio and OpenAI credentials are required")
 
     def client(self):
-        self.ready()
+        if not self.s.twilio_sid or not self.s.twilio_token:
+            raise PermissionError("Twilio account credentials are required")
         from twilio.http.http_client import TwilioHttpClient
         return Client(self.s.twilio_sid, self.s.twilio_token,
                       http_client=TwilioHttpClient(timeout=15, max_retries=0))
