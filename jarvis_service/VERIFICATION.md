@@ -52,3 +52,5 @@ Enable Gmail, Calendar and People APIs and configure a Web application OAuth cli
 The Work environment is used to prepare and verify changes; the Render service hosts the persistent agent. Browser voice requires an open, visible page. A permanent wake word or operating-system-wide background voice agent has not been implemented.
 
 Latest deployed runtime: 59c4c4521ed90d54ce82e09e6954f25c17ab418d. Render deployment dep-dbtr0v8u01pc73crltn0 became live November 16, 2026 at 8:41 PM America/New_York. CI completed successfully before deployment. Peak container memory during mocked-provider verification was 94,695,424 bytes.
+
+External post-deployment verification passed: https://github.com/000aar0n/AARON-1/actions/runs/43997494646 . The deployed health endpoint, Talk UI, speech controller and unauthenticated rejection for the spoken-turn API were checked without credentials or paid provider usage.
