@@ -2,7 +2,7 @@
 
 This is a separate, reviewable personal-assistant service under AARON-1. The existing planner is not modified.
 
-**Status: 33 offline tests and container persistence checks passed; NOT an operational assistant.** Consult [VERIFICATION.md](VERIFICATION.md) for test evidence and blockers.
+**Status: 46 offline tests and container persistence checks passed; NOT an operational assistant.** Consult [VERIFICATION.md](VERIFICATION.md) for test evidence and blockers.
 
 ## Official OpenJarvis dependency
 
@@ -117,3 +117,19 @@ The revised proposal uses 0.5 CPU / 512 MB RAM ($7/month) plus a 1 GB persistent
 Initial deployment can generate OWNER_TOKEN and TOKEN_ENCRYPTION_KEY privately in Render, and derive its public origin from RENDER_EXTERNAL_URL. Google OAuth credentials are added privately later. All provider usage remains unavailable without credentials and explicit allowances.
 
 Deployment attempt status: the Render Blueprint exists with auto-sync disabled, but its first plan returned need_payment_info. It manages no resources. Add a payment method in Aaron Kotchen's Workspace → Billing, then retry planning. No paid service has started.
+
+## Natural-language personal assistant
+
+The owner console now accepts plain-English tasks and follow-up instructions. The task runner uses the official OpenJarvis SDK to plan a bounded sequence of read operations and proposed actions. It can answer general questions, draft writing or code text, search connected contacts, check primary-calendar availability, inspect monitored inbox data and prepare messages, calls or appointments.
+
+For example: “Find a free hour next week, look up the contact, and draft an invitation for me to review.” If it lacks the exact person, date, number or permission, it asks for the missing details instead of inventing them.
+
+Tasks and observations are encrypted and persist across restarts. The scheduler resumes tasks after owner-approved actions succeed. Failed, rejected or uncertain writes stop automatic continuation. A task is limited to eight planning turns, and each model request consumes the owner's existing approved allowance. The owner can follow up in the console; typing instructions does not bypass per-action approval.
+
+Task planning permits up to 24,000 data characters and 1,600 output tokens per model invocation, compared with the smaller inbox-analysis limit. This increases potential per-request usage but never starts paid inference without credentials and an approved allowance.
+
+The authenticated /api/capabilities endpoint reports implemented and unavailable tools. Arbitrary computer control, browser automation, web research, purchases, deletions, remote code execution and unconnected apps remain unavailable. Drafting code in a response does not run or deploy it. It cannot automatically gain permissions to every app or use school Google access before OAuth consent.
+
+No model receives the owner bearer token or an approval endpoint. Tool observations are untrusted data. All consequential external actions still enter the exact-payload approval queue. The UI displays provider receipts separately from model-generated prose.
+
+Verification for this revision: [46 tests and resource-limited container checks](https://github.com/000aar0n/AARON-1/actions/runs/43985658937), runtime commit 117369a92f7e1a222851504d6a75f948dd021b90. Peak memory was 94,613,504 bytes with the server and a mocked-provider OpenJarvis inference pipeline. Real voice/load tests remain outstanding.

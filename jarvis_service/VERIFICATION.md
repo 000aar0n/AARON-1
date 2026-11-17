@@ -75,3 +75,15 @@ Off-host backup scheduling, production alerts, provider-wide billing caps, a dep
 ## Cost-reduction revision
 
 The owner accepted the previously quoted $25.25/month hosting ceiling and the named workspace. A smaller $7.25/month proposal (0.5 CPU / 512 MB plus 1 GB disk) has passed the capacity checks before provisioning. Source and test changes are on the same draft PR. The resource-limited revision passed 33 tests, Docker build and restart checks: https://github.com/000aar0n/AARON-1/actions/runs/43984557836 . Tested commit: edf336a5f8482e0bad484ca460ece553d6b733b7. The container was limited to 512 MB with swap disabled and 0.5 CPU, while the HTTP server and actual OpenJarvis SDK inference pipeline ran concurrently with only the provider response mocked. Peak cgroup memory was 94,359,552 bytes (about 90 MiB). This supports initial use of the smaller tier; real voice/concurrent-provider load is still untested. Acceptance of the hosting cost does not authorize live phone/model usage or substitute for the provider's required deployment-plan review.
+
+## Expanded personal-assistant task runner
+
+Runtime tested: 117369a92f7e1a222851504d6a75f948dd021b90. [CI evidence](https://github.com/000aar0n/AARON-1/actions/runs/43985658937): **46 tests passed**, dependency and compile checks passed, Docker built, 512 MB/no-swap/0.5 CPU container health/auth/non-root/restart checks passed. Peak cgroup memory: **94,613,504 bytes**.
+
+Added owner-authenticated natural-language task submission, follow-up, encrypted persistent task history, bounded read/plan loops, and automatic continuation after approved actions succeed. Tests verify contact lookup followed by a pending email proposal, owner-only API access, task persistence, pause behavior, unknown-tool rejection, prevention of self-granted inference allowance, validation before queueing, duplicate-proposal avoidance, bounded calendar reads, planning turn limits, and stopping after failed/uncertain writes.
+
+The task model never executes an external write directly. Only the owner approval queue invokes existing executors. Natural-language answers are model output; the separately rendered action receipts carry actual API outcomes.
+
+Capabilities are limited to installed adapters. General explanations and writing/code drafting can be produced through the model; monitored inbox reads, contact lookup, calendar checks and reviewed email/call/appointment actions are implemented. **Universal website/computer control is not implemented.** Browser automation, web research, purchases, data deletion, remote code execution and unconnected apps are explicitly reported as unavailable.
+
+This does not change activation status: the service is not deployed, Render still requires payment information, school OAuth and provider credentials remain absent, and live email/call/booking tests are unverified.
