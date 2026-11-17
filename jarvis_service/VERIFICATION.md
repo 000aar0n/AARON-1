@@ -71,3 +71,7 @@ Provider timeouts on consequential writes are marked uncertain and are not autom
 Model allowances bound analysis invocations and expiry; they are not a guaranteed dollar cap. Configure provider spending controls. SDK retry behavior can affect charges.
 
 Off-host backup scheduling, production alerts, provider-wide billing caps, a dependency vulnerability audit and a full production security review have not been completed. The scheduler and redacted local audit logs are implemented; this does not establish 24/7 uptime. Inbox monitoring uses a seven-day lookback and at most 500 messages per run rather than complete mailbox synchronization.
+
+## Cost-reduction revision
+
+The owner accepted the previously quoted $25.25/month hosting ceiling and the named workspace. A smaller $7.25/month proposal (0.5 CPU / 512 MB plus 1 GB disk) is being tested before provisioning. Source and test changes are on the same draft PR. The 33-test/container evidence above describes the earlier runtime revision; the new resource-limited run must pass before claiming the smaller tier is verified. Acceptance of the hosting cost does not authorize live phone/model usage or substitute for the provider's required deployment-plan review.

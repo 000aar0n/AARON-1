@@ -4,7 +4,7 @@ services:
   - type: web
     name: aaron-jarvis
     runtime: docker
-    plan: 1c-2g
+    plan: 0.5c-512mb
     region: virginia
     branch: jarvis/personal-assistant
     numInstances: 1
@@ -17,18 +17,12 @@ services:
       mountPath: /var/lib/jarvis
       sizeGB: 1
     envVars:
-      - key: PUBLIC_URL
-        sync: false
       - key: OWNER_TOKEN
         generateValue: true
       - key: TOKEN_ENCRYPTION_KEY
-        sync: false
+        generateValue: true
       - key: GOOGLE_ALLOWED_EMAIL
         value: c29ak@dalton.org
-      - key: GOOGLE_CLIENT_ID
-        sync: false
-      - key: GOOGLE_CLIENT_SECRET
-        sync: false
       - key: DATA_DIR
         value: /var/lib/jarvis
       - key: OPENJARVIS_HOME
@@ -43,3 +37,6 @@ services:
         value: gpt-realtime
 # Add optional OPENAI_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN,
 # TWILIO_PHONE_NUMBER privately after provider accounts and charges are approved.
+
+# Google OAuth client ID and secret are added privately after initial deployment.
+# PUBLIC_URL defaults to Render's documented RENDER_EXTERNAL_URL.

@@ -109,3 +109,9 @@ The fixed lookback and 500-message cap are bounded monitoring, not a guaranteed 
 The GitHub workflow installs the pinned upstream repository, checks dependency compatibility and syntax, runs offline contract/security tests, and parses the deployment YAML. These tests use fake Google/Twilio/model providers. They are not proof that school OAuth, billing, email sending or phone audio work live.
 
 After deployment, run `python -m jarvis_service.verify` with PUBLIC_URL, OWNER_TOKEN and GOOGLE_ALLOWED_EMAIL set privately. This only probes read access; it never sends, books, calls or spends on model inference. The CI container smoke test uses synthetic credentials and checks privilege drop, startup, authenticated access and persistence across a restart.
+
+## Lower-cost hosting revision
+
+The revised proposal uses 0.5 CPU / 512 MB RAM ($7/month) plus a 1 GB persistent disk ($0.25/month), totaling $7.25/month before taxes/overages and provider usage. CI now tests a 512 MB container with swap disabled, the running server plus the real OpenJarvis inference pipeline with a mocked provider, and restart persistence. This is an initial capacity check, not a live simultaneous voice-load benchmark. Upgrade only after measured resource pressure and within the owner's approved ceiling.
+
+Initial deployment can generate OWNER_TOKEN and TOKEN_ENCRYPTION_KEY privately in Render, and derive its public origin from RENDER_EXTERNAL_URL. Google OAuth credentials are added privately later. All provider usage remains unavailable without credentials and explicit allowances.

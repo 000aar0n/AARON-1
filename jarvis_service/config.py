@@ -39,7 +39,7 @@ class Settings:
     @classmethod
     def from_env(cls):
         return cls(
-            public_url=os.environ["PUBLIC_URL"].rstrip("/"),
+            public_url=(os.getenv("PUBLIC_URL") or os.environ["RENDER_EXTERNAL_URL"]).rstrip("/"),
             owner_token=os.environ["OWNER_TOKEN"],
             encryption_key=os.environ["TOKEN_ENCRYPTION_KEY"],
             google_email=os.environ["GOOGLE_ALLOWED_EMAIL"],
