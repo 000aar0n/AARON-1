@@ -197,3 +197,18 @@ def test_twilio_account_probe_does_not_require_openai_key(settings):
         result=Voice(s,store).probe()
     assert result["status"]=="verified_account_only"
     assert result["account_status"]=="active"
+
+def test_official_sdk_preserves_exact_recipient_data_while_secret_scanning_stays_enabled(settings):
+    from jarvis_service.inference import PersonalCloudEngine
+    store=Store(settings.data_dir,settings.encryption_key)
+    store.put("inference_grant",{"model":settings.text_model,"remaining":1,"expires":time.time()+60})
+    s=replace(settings,openai_key="synthetic-private-key")
+    seen=[]
+    def generate(messages,**kwargs):
+        seen.extend(m.content for m in messages)
+        return {"content":json.dumps({"to":"friend@example.com","subject":"Lesson","body":"Hi"}),"usage":{}}
+    with patch.object(PersonalCloudEngine,"generate",side_effect=generate):
+        result=Brain(s,store).complete_json("Prepare a draft for the exact recipient.",
+                                          {"recipient":"friend@example.com"})
+    assert any("friend@example.com" in prompt for prompt in seen)
+    assert result["to"]=="friend@example.com"

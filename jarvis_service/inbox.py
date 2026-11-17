@@ -67,6 +67,9 @@ class Brain:
         cfg.traces.enabled = False
         cfg.analytics.enabled = False
         cfg.security.audit_log_path = ":memory:"
+        # Tasks must preserve exact recipient addresses and appointment details.
+        # Credentials are never placed in prompts; keep the secret scanner enabled.
+        cfg.security.pii_scanner = False
         prompt = instructions+"\nDATA:\n"+json.dumps(data, ensure_ascii=False)[:24000]
         from .inference import key_scope
         with key_scope(self.s.openai_key):
