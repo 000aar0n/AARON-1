@@ -100,10 +100,10 @@ el("task-submit").onclick=()=>run(async()=>{
   try {
     show("result",await api("/api/tasks","POST",{instruction}));
     el("task-input").value="";await refresh();
-  } finally {el("task-submit").disabled=false;}
+  } finally {el("task-submit").disabled=!chatReady;}
 });
 
-let modelName="gpt-4o-mini";
+let modelName="gpt-4o-mini",chatReady=false;
 function renderSetup(setup) {
   modelName=setup.model.model;
   el("model-state").textContent=!setup.model.configured ? "API key needed" :
@@ -117,7 +117,8 @@ function renderSetup(setup) {
   el("phone-webhook").textContent=setup.phone.webhook;
   el("connect").disabled=!setup.google.configured;
   el("monitor").disabled=!setup.google.connected;
-  el("task-submit").disabled=!setup.model.configured || !setup.model.allowance_active;
+  chatReady=setup.model.configured && setup.model.allowance_active;
+  el("task-submit").disabled=!chatReady;
   el("chat-guidance").textContent=el("task-submit").disabled ?
     "Finish AI chat setup and approve a bounded usage allowance before asking Jarvis to work." :
     "Describe what you need. Jarvis will prepare consequential actions for your approval.";

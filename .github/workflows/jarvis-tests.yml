@@ -25,6 +25,14 @@ jobs:
         run: python -m pytest -q jarvis_service/tests
       - name: Validate deployment blueprint syntax
         run: python -c "import yaml; x=yaml.safe_load(open('jarvis_service/render.yaml')); assert x['services'][0]['numInstances']==1; assert x['services'][0]['disk']['mountPath']=='/var/lib/jarvis'"
+      - name: Check browser script syntax
+        run: node --check jarvis_service/ui.js
+      - name: Install browser test tooling
+        run: pip install 'playwright>=1.55,<2'
+      - name: Install Chromium for the setup flow test
+        run: python -m playwright install --with-deps chromium
+      - name: Test real browser login and private setup
+        run: python jarvis_service/tests/browser_setup.py
       - name: Build deployable container
         run: docker build -f jarvis_service/Dockerfile -t jarvis-ci .
       - name: Test container health, privilege drop and persistence
