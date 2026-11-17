@@ -38,6 +38,18 @@ def main():
             with sync_playwright() as p:
                 browser=p.chromium.launch()
                 context=browser.new_context(ignore_https_errors=True)
+                context.add_init_script("""
+                  window.voiceRecognitions=[];window.voiceUtterances=[];
+                  window.SpeechRecognition=class {
+                    constructor(){window.voiceRecognitions.push(this);}
+                    start(){this.onstart?.();}
+                    abort(){this.onend?.();}
+                  };
+                  window.SpeechSynthesisUtterance=class {constructor(text){this.text=text;}};
+                  Object.defineProperty(window,"speechSynthesis",{value:{
+                    cancel(){},getVoices(){return[];},speak(u){window.voiceUtterances.push(u);}
+                  }});
+                """)
                 page=context.new_page()
                 errors=[]
                 page.on("pageerror",lambda e:errors.append(str(e)))
@@ -67,6 +79,25 @@ def main():
                 page.on("dialog",lambda d:d.accept())
                 page.locator("#actions").get_by_role("button",name="Approve and execute once").click()
                 expect(page.locator("#task-submit")).to_be_enabled()
+                # Exercise the actual DOM/controller with synthetic microphone/provider events.
+                # A real user microphone and model account are still required for live audio.
+                page.route("**/api/voice/turn",lambda route:route.fulfill(status=200,
+                    content_type="application/json",body='{"conversation_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","task_id":"synthetic","status":"ready","reply":"Hello Aaron. What would you like to do?","needs_approval":false,"action_ids":[]}'))
+                expect(page.locator("#voice-panel")).to_be_visible()
+                assert not page.locator("#text-mode").evaluate("(e)=>e.open")
+                page.locator("#talk").click()
+                expect(page.locator("#voice-state")).to_contain_text("Listening")
+                page.evaluate("""()=>{
+                  const r=[{transcript:"Hello Jarvis"}];r.isFinal=true;
+                  window.voiceRecognitions.at(-1).onresult({resultIndex:0,results:[r]});
+                }""")
+                expect(page.locator("#voice-reply")).to_contain_text("Hello Aaron")
+                page.wait_for_function("window.voiceUtterances.length === 1")
+                assert page.evaluate("window.voiceUtterances[0].text").startswith("Hello Aaron")
+                page.evaluate("window.voiceUtterances[0].onend()")
+                page.wait_for_function("window.voiceRecognitions.length === 2")
+                page.locator("#talk").click()
+                expect(page.locator("#voice-state")).to_contain_text("Voice is off")
                 cookies=context.cookies()
                 session=next(c for c in cookies if c["name"]=="jarvis_session")
                 assert session["secure"] and session["httpOnly"] and session["sameSite"]=="Strict"
@@ -76,7 +107,7 @@ def main():
                 assert not errors,errors
                 context.close()
                 browser.close()
-            print("PASS: real-browser login, persistent session, encrypted credential forms, approval flow and logout")
+            print("PASS: real-browser login, persistent session, encrypted credential forms, approval flow, voice turn/playback/listening loop and logout")
             print("No Google consent, external model calls or phone calls were performed.")
         finally:
             process.terminate()

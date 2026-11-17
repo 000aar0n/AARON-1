@@ -19,6 +19,7 @@ from .google import Google
 from .inbox import Brain, Inbox
 from .voice import Voice
 from .tasks import Tasks, TaskRequest
+from .spoken import Spoken, SpokenRequest
 from .setup import RuntimeSettings, Sessions, Login, ProviderSettings
 
 class Executor:
@@ -70,6 +71,7 @@ def create_app(settings=None, google_override=None, voice_override=None, brain_o
     brain = brain_override or Brain(s, store)
     inbox = Inbox(s, store, google, brain)
     tasks = Tasks(s, store, google, inbox, brain)
+    spoken = Spoken(s,store,tasks)
     executor = Executor(s, store, google, voice)
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     for logger in ("httpx", "httpcore", "googleapiclient", "openai", "websockets"):
@@ -189,6 +191,14 @@ def create_app(settings=None, google_override=None, voice_override=None, brain_o
     @app.put("/api/settings",dependencies=[Depends(owner)])
     def save_settings(payload: ProviderSettings):
         return s.update(payload)
+
+    @app.get("/speech.js")
+    def speech_script():
+        return FileResponse(Path(__file__).with_name("speech.js"),media_type="application/javascript")
+
+    @app.post("/api/voice/turn",dependencies=[Depends(owner)])
+    def spoken_turn(request: SpokenRequest):
+        return spoken.turn(request)
 
     @app.get("/api/status", dependencies=[Depends(owner)])
     def status():

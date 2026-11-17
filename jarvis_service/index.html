@@ -13,7 +13,14 @@ a{color:#a9ccff}.panel{border:1px solid #333e4d;padding:24px;border-radius:14px;
 .setup-grid .card{margin:0}label{display:block;margin-top:14px;color:#aebbd0;font-size:13px}
 label input{width:92%;min-width:0;margin-top:6px}details{margin:14px 0}summary{cursor:pointer;color:#a9ccff}
 [hidden]{display:none!important}button:disabled{opacity:.45;cursor:default}
-</style><script src="/ui.js" defer></script></head>
+.voice-panel{text-align:center;padding:36px 24px}.voice-panel h2{font-size:34px;margin:0}
+.voice-orb{display:block;width:150px;height:150px;border-radius:50%;margin:24px auto;font-size:24px;font-weight:700;background:#c9f66a;color:#172500;border:0}
+.voice-panel[data-state="listening"] .voice-orb{animation:breathe 1.4s ease-in-out infinite;box-shadow:0 0 0 16px #c9f66a19}
+.voice-panel[data-state="thinking"] .voice-orb{background:#8db9ff;animation:breathe 2s ease-in-out infinite}
+.voice-panel[data-state="speaking"] .voice-orb{background:#d0b5ff;animation:breathe .8s ease-in-out infinite}
+.voice-caption{font-size:19px;max-width:760px;margin:12px auto}.voice-note{font-size:12px;color:#8190a6;max-width:700px;margin:20px auto}
+@keyframes breathe{50%{transform:scale(1.055)}}@media(prefers-reduced-motion:reduce){.voice-orb{animation:none!important}}
+</style><script src="/speech.js" defer></script><script src="/ui.js" defer></script></head>
 <body><main><span class="pill">PERSONAL ASSISTANT · OWNER REVIEW</span><h1>Jarvis</h1>
 <p>Monitor, understand, and prepare. You approve each message, call, and commitment.</p>
 <p id="login-help">Enter your Owner access token once. This browser stays signed in securely for 12 hours.</p>
@@ -21,10 +28,19 @@ label input{width:92%;min-width:0;margin-top:6px}details{margin:14px 0}summary{c
 <input id="token" type="password" placeholder="Owner access token" autocomplete="off">
 <button id="unlock">Unlock</button><button id="lock" hidden>Sign out</button><p id="error" class="error"></p>
 <div id="console" hidden>
-<section class="panel" id="setup-panel">
+<section id="voice-panel" class="panel voice-panel" data-state="idle">
+<h2>Talk to Jarvis</h2><p>Tap once, speak, and hear Jarvis answer. It listens again when its reply finishes.</p>
+<button id="talk" class="voice-orb" aria-label="Talk to Jarvis">Talk</button>
+<button id="new-topic">New conversation</button>
+<p id="voice-state" role="status" aria-live="polite">Voice is off. Tap Talk to start.</p>
+<p id="voice-heard" class="voice-caption"></p><p id="voice-reply" class="voice-caption"></p>
+<p class="voice-note">Your browser handles microphone recognition and spoken playback. Its speech provider may process audio. Jarvis stores the transcript encrypted, not the raw microphone audio.</p>
+</section>
+
+<details class="panel" id="setup-panel" open><summary>Connections and one-time setup</summary>
 <h2>Finish setup</h2><p id="setup-summary">Checking connections…</p>
 <div class="setup-grid">
-<div class="card"><h3>1 · AI chat</h3><p id="model-state"></p>
+<div class="card"><h3>1 · AI voice</h3><p id="model-state"></p>
 <p>Add an OpenAI API key privately here. Saving it does not start paid usage. Task content, including relevant email and contact details, is sent to OpenAI when you ask Jarvis to use it.</p>
 <label>OpenAI API key<input id="openai-key" type="password" autocomplete="off" placeholder="Enter a new key"></label>
 <button id="save-model">Save key</button><a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">Create API key</a>
@@ -46,16 +62,16 @@ label input{width:92%;min-width:0;margin-top:6px}details{margin:14px 0}summary{c
 <label>Twilio phone number<input id="twilio-number" placeholder="+12125550100" autocomplete="off"></label>
 <button id="save-phone">Save phone configuration</button><p>Incoming voice webhook:</p><pre id="phone-webhook"></pre></details></div>
 </div><button id="probe">Check connections without placing calls</button><p id="setup-result"></p>
-</section>
+</details>
 
 
 <button id="monitor">Check inbox</button><button id="refresh">Refresh</button>
 <button id="pause">Pause Jarvis and revoke unused allowances</button><button id="resume">Resume</button>
-<h2>Talk to Jarvis</h2>
+<details id="text-mode"><summary>Optional text mode</summary>
 <p id="chat-guidance">Describe a task in plain English. Jarvis can read connected information, draft writing, and prepare actions for review. Model requests use your approved allowance.</p>
 <textarea id="task-input" maxlength="4000" placeholder="Find a free hour next week, look up the contact, and draft an invitation for me to review."></textarea>
 <button id="task-submit">Work on this</button>
-<div id="tasks"></div>
+<div id="tasks"></div></details>
 <h2>Service status</h2><pre id="status"></pre>
 <h2>Approval queue</h2><p>Review the exact recipient, content, purpose, duration, and charges. Approval executes that action once. An uncertain outcome must be checked at the provider before retrying.</p><div id="actions"></div>
 <h2>Inbox</h2><p>AI responses are local drafts until you explicitly approve saving or sending them.</p><div id="inbox"></div>

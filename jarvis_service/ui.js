@@ -52,7 +52,8 @@ async function refresh() {
     if(a.state==="pending") {
       button("Approve and execute once", async()=>{
         if (!window.confirm("Execute this exact action? Any stated provider charges are approved for this action.")) return;
-        show("result",await api("/api/actions/"+a.id+"/approve","POST",{digest:a.digest}));await refresh();
+        const result=await api("/api/actions/"+a.id+"/approve","POST",{digest:a.digest});
+        show("result",result);await refresh();window.jarvisSpeech?.actionResult(result);
       },card);
       button("Reject",async()=>{await api("/api/actions/"+a.id+"/reject","POST");await refresh();},card);
     }
@@ -73,6 +74,7 @@ async function refresh() {
 }
 function signedIn(value) {
   el("console").hidden=!value;
+  if(!value)window.jarvisSpeech?.stop();
   for (const id of ["token","unlock","login-help","login-guide"]) el(id).hidden=value;
   el("lock").hidden=!value;
 }
@@ -89,6 +91,7 @@ el("lock").onclick=()=>run(async()=>{
 el("refresh").onclick=()=>run(refresh);
 el("connect").onclick=()=>run(async()=>{const r=await api("/api/oauth/google/start","POST");window.location.assign(r.url);});
 for(const id of ["probe","monitor","pause","resume"]) el(id).onclick=()=>run(async()=>{
+  if(id==="pause")window.jarvisSpeech?.stop("Jarvis is paused.");
   show("result",await api("/api/"+id,"POST"));await refresh();});
 el("propose").onclick=()=>run(async()=>{
   show("result",await api("/api/actions","POST",JSON.parse(el("proposal").value)));await refresh();});
@@ -119,12 +122,13 @@ function renderSetup(setup) {
   el("monitor").disabled=!setup.google.connected;
   chatReady=setup.model.configured && setup.model.allowance_active;
   el("task-submit").disabled=!chatReady;
+  el("setup-panel").open=!chatReady;
   el("chat-guidance").textContent=el("task-submit").disabled ?
-    "Finish AI chat setup and approve a bounded usage allowance before asking Jarvis to work." :
+    "Finish AI voice setup and approve a bounded usage allowance before asking Jarvis to work." :
     "Describe what you need. Jarvis will prepare consequential actions for your approval.";
   el("setup-summary").textContent=setup.model.configured && setup.model.allowance_active ?
-    "AI chat is ready to try. Connect Google and phone features below as needed." :
-    "Start with AI chat. The remaining connections can be completed afterward.";
+    "AI voice is ready to try. Connect Google and phone features below as needed." :
+    "Start with AI voice. The remaining connections can be completed afterward.";
 }
 async function saveSettings(values,fields) {
   await api("/api/settings","PUT",values);
@@ -154,4 +158,31 @@ async function restoreSession() {
     await refresh();signedIn(true);
   } catch(e) {signedIn(false);}
 }
+window.jarvisSpeech=new window.JarvisSpeech({
+  isReady:()=>chatReady,
+  onSetupRequired:()=>{el("setup-panel").open=true;el("setup-panel").scrollIntoView({behavior:"smooth"});},
+  onState:(state,message,active)=>{
+    el("voice-panel").dataset.state=state;el("voice-state").textContent=message;
+    el("talk").textContent=active?"Stop":"Talk";
+    el("talk").setAttribute("aria-label",active?"Stop voice conversation":"Talk to Jarvis");
+  },
+  onTranscript:text=>{el("voice-heard").textContent="You: "+text;},
+  onReply:text=>{el("voice-reply").textContent="Jarvis: "+text;},
+  onError:error=>{el("error").textContent=error.message;},
+  request:async(text,conversation_id)=>{
+    const result=await api("/api/voice/turn","POST",{
+      text,conversation_id:conversation_id || null,
+      request_id:crypto.randomUUID().replaceAll("-","")
+    });
+    await refresh();return result;
+  }
+});
+el("talk").onclick=()=>{
+  if(window.jarvisSpeech.active || window.jarvisSpeech.speaking)window.jarvisSpeech.stop();
+  else window.jarvisSpeech.start();
+};
+el("new-topic").onclick=()=>window.jarvisSpeech.newTopic();
+document.addEventListener("visibilitychange",()=>{if(document.hidden)window.jarvisSpeech.stop("Voice stopped because this tab was hidden.");});
+if(!window.jarvisSpeech.supported)
+  el("voice-state").textContent="Spoken conversation needs a compatible browser, such as personal Chrome or Safari.";
 restoreSession();
